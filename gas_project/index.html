@@ -1,0 +1,502 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ジム体験予約</title>
+  <!-- 広告タグプレースホルダー -->
+  <!-- Google Tag Manager -->
+  <!-- Meta Pixel Code -->
+
+  <?!= include('style'); ?>
+</head>
+
+<body>
+  <div id="app" class="app-container">
+    <header class="header">
+      <h1 class="logo-text">FITABLE 予約</h1>
+    </header>
+
+    <main class="main-content">
+      <!-- ページフラグによって初期表示を切り替え可能 -->
+      <input type="hidden" id="page-param" value="<?= page ?>">
+
+      <!-- ステップ1：店舗選択 -->
+      <section id="step-1" class="step-section active">
+        <h2 class="section-title">体験希望の店舗を選択</h2>
+        <div id="store-button-container" class="store-grid">
+          <!-- 店舗ボタンが動的に生成されます -->
+          <div class="text-center" style="padding: 40px; color: var(--text-sub);">
+            店舗情報を読み込み中...
+          </div>
+        </div>
+      </section>
+
+      <!-- ステップ2：店舗・日時選択 -->
+      <section id="step-2" class="step-section">
+        <div class="step-header">
+          <button class="back-btn" onclick="goToStep(1)">← 戻る</button>
+          <h2 class="section-title">店舗と日時の選択</h2>
+        </div>
+
+        <div class="form-group">
+          <label for="store-select">ご希望の店舗</label>
+          <select id="store-select" class="form-control" onchange="loadWeeklyCalendarFromStore()">
+            <option value="">店舗を選択してください</option>
+            <!-- 店舗リストが動的に生成されます -->
+          </select>
+        </div>
+
+        <div id="weekly-calendar-container" style="display:none; margin-top: 20px;">
+          <div class="weekly-nav">
+            <button class="nav-btn" onclick="changeWeek(-1)">◀ 前週</button>
+            <h3 id="weekly-date-range"></h3>
+            <button class="nav-btn" onclick="changeWeek(1)">次週 ▶</button>
+          </div>
+
+          <div class="weekly-grid-wrapper">
+            <div class="weekly-grid" id="weekly-grid">
+              <!-- カレンダーがここに生成されます -->
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ステップ3：金額表示・決済 -->
+      <section id="step-3" class="step-section">
+        <div class="step-header">
+          <button class="back-btn" onclick="goToStep(2)">← 戻る</button>
+          <h2 class="section-title">プランとお支払い</h2>
+        </div>
+
+        <div class="price-card">
+          <!-- JSで動的に書き換えます -->
+        </div>
+
+        <div class="form-group">
+          <label>お支払い方法</label>
+          <label class="radio-label">
+            <input type="radio" name="payment" value="onsite" checked>
+            <span>当日ジムにて精算（無料の場合は0円）</span>
+          </label>
+        </div>
+
+        <button class="primary-btn mt-4" onclick="goToStep(4)">次へ進む</button>
+      </section>
+
+      <!-- ステップ4：個人情報入力・規約同意 -->
+      <section id="step-4" class="step-section">
+        <div class="step-header">
+          <button class="back-btn" onclick="goToStep(3)">← 戻る</button>
+          <h2 class="section-title">お客様情報の入力</h2>
+        </div>
+
+        <form id="booking-form" onsubmit="event.preventDefault(); goToStep(5);">
+          <div class="form-group">
+            <label for="name">氏名 <span class="badge">必須</span></label>
+            <input type="text" id="name" class="form-control" required placeholder="山田 太郎">
+          </div>
+
+          <div class="form-group">
+            <label for="kana">フリガナ <span class="badge">必須</span></label>
+            <input type="text" id="kana" class="form-control" required placeholder="ヤマダ タロウ">
+          </div>
+
+          <div class="form-group">
+            <label for="phone">電話番号 <span class="badge">必須</span></label>
+            <input type="tel" id="phone" class="form-control" required placeholder="090-1234-5678">
+          </div>
+
+          <div class="form-group">
+            <label for="email">メールアドレス <span class="badge">必須</span></label>
+            <input type="email" id="email" class="form-control" required placeholder="example@mail.com">
+          </div>
+
+          <div class="form-group">
+            <label for="email-confirm">メールアドレス（確認用） <span class="badge">必須</span></label>
+            <input type="email" id="email-confirm" class="form-control" required placeholder="確認のためもう一度入力してください">
+          </div>
+
+          <div class="terms-box">
+            <h4>体験時利用規約</h4>
+            <p>第1条（目的）<br>本規約は、当ジムの体験利用に関する条件を定めるものです...（以下略）</p>
+          </div>
+
+          <label class="checkbox-label">
+            <input type="checkbox" id="terms" required>
+            <span>利用規約に同意する</span>
+          </label>
+
+          <button type="submit" class="primary-btn mt-4">予約内容の確認へ</button>
+        </form>
+      </section>
+
+      <!-- ステップ5：確認・完了 -->
+      <section id="step-5" class="step-section">
+        <div class="step-header">
+          <button class="back-btn" onclick="goToStep(4)">← 戻る</button>
+          <h2 class="section-title">ご予約内容の確認</h2>
+        </div>
+
+        <h3 class="subsection-title">お客様情報</h3>
+        <div class="summary-card" style="margin-bottom: 24px;">
+          <dl class="summary-list">
+            <dt>氏名</dt>
+            <dd id="sum-name"></dd>
+            <dt>電話番号</dt>
+            <dd id="sum-phone"></dd>
+            <dt>メール</dt>
+            <dd id="sum-email"></dd>
+          </dl>
+        </div>
+
+        <h3 class="subsection-title">ご予約内容</h3>
+        <div class="summary-card" style="margin-bottom: 24px;">
+          <dl class="summary-list">
+            <dt>店舗</dt>
+            <dd id="sum-store"></dd>
+            <dt>日時</dt>
+            <dd id="sum-datetime"></dd>
+            <dt>プラン</dt>
+            <dd id="sum-plan">体験トレーニング（0円）</dd>
+          </dl>
+        </div>
+
+        <h3 class="subsection-title">確認事項</h3>
+        <div class="summary-card">
+          <dl class="summary-list">
+            <dt>持ち物</dt>
+            <dd id="sum-items" style="white-space: pre-wrap; font-size: 14px; font-weight: normal;"></dd>
+            <dt>店舗について</dt>
+            <dd id="sum-visit" style="white-space: pre-wrap; font-size: 14px; font-weight: normal;"></dd>
+          </dl>
+          <div style="margin-top: 16px; padding-top: 16px; border-top: 1px dashed var(--border-color);">
+            <label class="checkbox-label" style="border:none; padding:0; background:transparent;">
+              <input type="checkbox" id="confirm-items-check" onchange="toggleSubmitButton()">
+              <span style="font-weight:bold; color:var(--primary-color);">上記の内容（持ち物・ご来店に関する注意事項）を確認しました</span>
+            </label>
+          </div>
+        </div>
+
+        <button class="primary-btn mt-4" id="submit-btn" onclick="submitBooking()" disabled
+          style="opacity:0.5; cursor:not-allowed;">予約を確定する</button>
+      </section>
+
+      <!-- 完了画面（サンクスページ） -->
+      <section id="step-finish" class="step-section">
+        <div class="finish-card text-center">
+          <span class="icon large">🎉</span>
+          <h2 class="section-title">ご予約完了</h2>
+          <p>ご入力いただいたメールアドレスに詳細をお送りしました。</p>
+          <div class="booking-id-box">
+            <p>予約番号</p>
+            <h3 id="finish-booking-id">---</h3>
+          </div>
+          <p class="small-text mt-4">体験のご予約ありがとうございます！当日はお気をつけてお越しください。<br>お待ちしております！</p>
+        </div>
+      </section>
+
+      <!-- キャンセル画面 -->
+      <section id="step-cancel" class="step-section">
+        <div class="step-header">
+          <button class="back-btn" onclick="goToStep(1)">← トップへ</button>
+          <h2 class="section-title">予約のキャンセル</h2>
+        </div>
+
+        <form id="cancel-form" onsubmit="event.preventDefault(); submitCancel();">
+          <div class="form-group">
+            <label for="cancel-id">予約番号</label>
+            <input type="text" id="cancel-id" class="form-control" required placeholder="BK202...（メールに記載）">
+          </div>
+          <div class="form-group">
+            <label for="cancel-email">ご予約時のメールアドレス</label>
+            <input type="email" id="cancel-email" class="form-control" required>
+          </div>
+          <button type="submit" class="primary-btn mt-4" id="cancel-btn">キャンセルを実行する</button>
+        </form>
+        <div id="cancel-message" class="mt-4 text-center"></div>
+      </section>
+
+      <!-- キャンセル完了画面 -->
+      <section id="step-cancel-finish" class="step-section">
+        <div class="finish-card text-center">
+          <span class="icon large">✅</span>
+          <h2 class="section-title">キャンセル完了</h2>
+          <div class="booking-id-box">
+            <h3 id="cancel-finish-name">---</h3>
+            <p>様の予約キャンセルを承りました。</p>
+          </div>
+          <p>ご利用ありがとうございました。またのご予約をお待ちしております。</p>
+          <button class="primary-btn outline mt-4" onclick="goToStep(1)">トップへ戻る</button>
+        </div>
+      </section>
+
+      <!-- 管理画面：PIN認証 -->
+      <section id="step-admin-auth" class="step-section">
+        <div class="step-header">
+          <h2 class="section-title">管理者ログイン</h2>
+        </div>
+        <form id="admin-auth-form" onsubmit="event.preventDefault(); verifyPin();">
+          <div class="form-group">
+            <label for="admin-pin">PINコードを入力してください</label>
+            <input type="password" id="admin-pin" class="form-control" required>
+          </div>
+          <button type="submit" class="primary-btn mt-4">ログイン</button>
+        </form>
+        <div id="admin-auth-msg" class="mt-4 text-center" style="color:red;"></div>
+      </section>
+
+      <!-- 管理画面：メニュー -->
+      <section id="step-admin-menu" class="step-section">
+        <div class="step-header">
+          <h2 class="section-title">管理者メニュー</h2>
+        </div>
+        <div class="card-list">
+          <button class="card-btn" onclick="goToAdminSettings()">
+            <h3>店舗別：枠・休日設定</h3>
+            <p>営業時間や休館日の管理</p>
+          </button>
+          <button class="card-btn" onclick="goToAdminPlan()">
+            <h3>プラン・キャンペーン設定</h3>
+            <p>デフォルトプランと店舗ごとの個別プランの設定</p>
+          </button>
+          <button class="card-btn" onclick="goToAdminSystemConfig()">
+            <h3>システム全体・店舗基本設定</h3>
+            <p>店舗の追加、住所、カレンダー、通知先の設定</p>
+          </button>
+          <button class="card-btn" onclick="goToAdminCalendar()">
+            <h3>予約確認・カレンダー</h3>
+            <p>予約状況の確認と手動予約・キャンセル処理</p>
+          </button>
+        </div>
+      </section>
+
+      <!-- 管理画面：設定ダッシュボード -->
+      <section id="step-admin-dashboard" class="step-section">
+        <div class="sticky-admin-bar">
+          <div class="sticky-admin-bar-header">
+            <button class="back-btn" onclick="checkDirtyNavigation('goToAdminMenu')">← 戻る</button>
+            <h2 class="section-title">店舗・枠・休日設定</h2>
+            <div style="width: 50px;"></div>
+          </div>
+          <div class="sticky-admin-actions">
+            <span class="dirty-warning">⚠️未保存</span>
+            <button class="primary-btn" style="margin: 0; padding: 8px 32px; font-size: 14px;"
+              onclick="saveAdminSettings()">変更を保存</button>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="admin-store-select">設定する店舗</label>
+          <select id="admin-store-select" class="form-control" onchange="changeAdminStore(this)">
+            <option value="">店舗を選択してください</option>
+            <!-- 動的に生成 -->
+          </select>
+        </div>
+
+        <div id="admin-settings-container" style="display:none;">
+          <h3 class="subsection-title mt-4">休館日（店舗休業日）設定</h3>
+          <form id="admin-holiday-form" onsubmit="event.preventDefault(); addHoliday();">
+            <div class="form-group">
+              <label for="admin-holiday-date">休業にする日付を追加</label>
+              <div style="display:flex; gap:10px;">
+                <input type="date" id="admin-holiday-date" class="form-control" required>
+                <button type="submit" class="primary-btn" style="width:auto; padding:10px 20px;">追加</button>
+              </div>
+            </div>
+          </form>
+          <div id="admin-holidays-list" class="mt-4">
+            <!-- JSで休館日一覧を生成 -->
+          </div>
+
+          <hr class="mt-4" style="border:1px solid #eee;">
+
+          <h3 class="subsection-title mt-4">基本の営業時間・枠設定</h3>
+          <form id="admin-settings-form" onsubmit="event.preventDefault(); saveAdminSettings();">
+            <div id="days-container">
+              <!-- JSで曜日ごとのフォームを生成 -->
+            </div>
+          </form>
+        </div>
+      </section>
+
+      <!-- 管理画面：カレンダー -->
+      <section id="step-admin-calendar" class="step-section">
+        <div class="step-header">
+          <button class="back-btn" onclick="checkDirtyNavigation('goToAdminMenu')">← メニューへ戻る</button>
+          <h2 class="section-title">予約カレンダー</h2>
+        </div>
+
+        <div class="form-group">
+          <label for="admin-cal-store-select">店舗</label>
+          <select id="admin-cal-store-select" class="form-control" onchange="loadAdminCalendar()">
+            <option value="">店舗を選択してください</option>
+            <!-- 動的に生成 -->
+          </select>
+        </div>
+
+        <div class="calendar-controls mt-4" style="display:none;" id="cal-controls">
+          <button onclick="changeCalMonth(-1)">前月</button>
+          <h3 id="cal-month-display">2026年5月</h3>
+          <button onclick="changeCalMonth(1)">翌月</button>
+        </div>
+
+        <div id="admin-calendar-container" class="mt-4" style="display:none;">
+          <!-- カレンダーテーブルをJSで描画 -->
+        </div>
+
+        <div id="admin-reservation-details" class="mt-4" style="display:none;">
+          <div class="step-header">
+            <h3 class="section-title" id="admin-selected-date-title">選択した日付の予約</h3>
+          </div>
+          <div id="admin-reservations-list"></div>
+
+          <div id="admin-manual-booking-section" class="mt-4">
+            <button id="admin-manual-booking-start-btn" class="primary-btn outline"
+              onclick="adminShowSlotSelection()">この日に手動で予約を入れる</button>
+
+            <!-- 時間スロット選択（手動予約用） -->
+            <div id="admin-manual-slot-container" class="mt-4" style="display:none;">
+              <h4 class="subsection-title">予約時間を選択</h4>
+              <div id="admin-manual-slots-grid" class="slots-grid"></div>
+            </div>
+
+            <!-- 入力フォーム（手動予約用） -->
+            <div id="admin-manual-form-container" class="mt-4" style="display:none;">
+              <h4 class="subsection-title">お客様情報入力</h4>
+              <div class="form-group">
+                <label>お名前 <span class="badge">必須</span></label>
+                <input type="text" id="admin-manual-name" class="form-control" placeholder="氏名を入力">
+              </div>
+              <div class="form-group">
+                <label>電話番号 <span class="badge">必須</span></label>
+                <input type="tel" id="admin-manual-phone" class="form-control" placeholder="電話番号を入力">
+              </div>
+              <button class="primary-btn" onclick="submitAdminManualBooking()">予約を確定する</button>
+              <button class="back-btn mt-4" onclick="adminCancelManualBooking()">キャンセル</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ローディングオーバーレイ -->
+      <div id="loading" class="loading-overlay" style="display:none;">
+        <div class="spinner"></div>
+        <p>処理中...</p>
+      </div>
+
+      <!-- 管理画面：プラン・キャンペーン設定 -->
+      <section id="step-admin-plan" class="step-section">
+        <div class="sticky-admin-bar">
+          <div class="sticky-admin-bar-header">
+            <button class="back-btn" onclick="checkDirtyNavigation('goToAdminMenu')">← 戻る</button>
+            <h2 class="section-title">プラン・キャンペーン</h2>
+            <div style="width: 50px;"></div>
+          </div>
+          <div class="sticky-admin-actions">
+            <span class="dirty-warning">⚠️未保存</span>
+            <button class="primary-btn" style="margin: 0; padding: 8px 32px; font-size: 14px;"
+              onclick="saveAdminPlanSettings()">一括保存</button>
+          </div>
+        </div>
+
+        <div class="card p-3">
+          <h3 class="subsection-title">デフォルト（全店舗共通）プラン設定</h3>
+          <p class="small-text mb-4">店舗ごとの個別設定がない場合、以下の内容が適用されます。</p>
+          <div class="form-group">
+            <label>プラン名</label>
+            <input type="text" id="sys-default-plan" class="form-control" placeholder="体験トレーニング">
+          </div>
+          <div class="form-group">
+            <label>通常価格</label>
+            <input type="text" id="sys-default-normal-price" class="form-control" placeholder="価格1,650円(税込)">
+          </div>
+          <div class="form-group">
+            <label class="admin-checkbox" style="margin-bottom: 8px; display: block;">
+              <input type="checkbox" id="sys-default-no-campaign" onchange="toggleDefaultCampaign()"> キャンペーンを実施しない
+            </label>
+          </div>
+          <div id="sys-default-campaign-group">
+            <div class="form-group">
+              <label>キャンペーン価格</label>
+              <input type="text" id="sys-default-campaign-price" class="form-control" placeholder="0円">
+            </div>
+            <div class="form-group">
+              <label>キャンペーン備考（改行可）</label>
+              <textarea id="sys-default-campaign-memo" class="form-control" rows="2"></textarea>
+            </div>
+          </div>
+
+          <hr class="my-4">
+
+          <h3 class="subsection-title mt-4">店舗ごとの個別設定（上書き）</h3>
+          <p class="small-text mb-4">店舗ごとに異なるキャンペーンを行う場合はこちらに入力してください。空欄の場合はデフォルト設定が適用されます。</p>
+          <div id="admin-plan-store-list-container">
+            <!-- 店舗ごとのプラン設定ブロックが並ぶ -->
+          </div>
+        </div>
+      </section>
+
+      <!-- 管理画面：システム基本設定 -->
+      <section id="step-admin-system" class="step-section">
+        <div class="sticky-admin-bar">
+          <div class="sticky-admin-bar-header">
+            <button class="back-btn" onclick="checkDirtyNavigation('goToAdminMenu')">← 戻る</button>
+            <h2 class="section-title">システム基本設定</h2>
+            <div style="width: 50px;"></div>
+          </div>
+          <div class="sticky-admin-actions">
+            <span class="dirty-warning">⚠️未保存</span>
+            <button class="primary-btn" style="margin: 0; padding: 8px 32px; font-size: 14px;"
+              onclick="saveSystemSettings()">一括保存</button>
+          </div>
+        </div>
+
+        <div class="card p-3">
+          <h3 class="subsection-title">共通設定</h3>
+          <div class="form-group">
+            <label for="sys-admin-pin">管理者ログインPINコード</label>
+            <input type="text" id="sys-admin-pin" class="form-control">
+          </div>
+
+          <h4 class="subsection-title mt-4">デフォルト（全店舗共通）店舗基本設定</h4>
+          <p class="small-text mb-4">各店舗の詳細設定が空欄の場合、以下の内容が適用されます。</p>
+          <div class="form-group">
+            <label>GoogleカレンダーID</label>
+            <input type="text" id="sys-default-cal-id" class="form-control" placeholder="primary">
+          </div>
+          <div class="form-group">
+            <label>Google Chat WebhookURL</label>
+            <input type="text" id="sys-default-webhook" class="form-control">
+          </div>
+          <div class="form-group">
+            <label>メール案内：当日の持ち物（改行可）</label>
+            <textarea id="sys-default-email-items" class="form-control" rows="3"></textarea>
+          </div>
+          <div class="form-group">
+            <label>メール案内：ご来店について（改行可）</label>
+            <textarea id="sys-default-email-visit" class="form-control" rows="3"></textarea>
+          </div>
+          <div class="form-group">
+            <label>利用規約（改行可）</label>
+            <textarea id="sys-default-terms" class="form-control" rows="4"></textarea>
+          </div>
+
+          <hr class="my-4">
+
+          <h3 class="subsection-title mt-4">店舗一覧と詳細設定</h3>
+          <div id="admin-store-list-container">
+            <!-- 店舗ごとの編集ブロックが並ぶ -->
+          </div>
+
+          <button class="primary-btn outline mt-4 mb-4" onclick="addNewStoreBlock()">＋ 新しい店舗を追加</button>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <?!= include('script'); ?>
+</body>
+
+</html>

@@ -1,0 +1,864 @@
+/* 
+ * FITABLE 体験予約システム Global Styles
+ * テーマ: 白ベース × オレンジアクセント (親しみやすさ・プレミアム感)
+ */
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Noto+Sans+JP:wght@400;500;700;900&display=swap');
+
+:root {
+  --primary-color: #ff6b00;
+  --primary-hover: #ff8533;
+  --primary-gradient: linear-gradient(135deg, #ff8533 0%, #ff5a00 100%);
+  --bg-color: #faf9f6;
+  --card-bg: #ffffff;
+  --text-main: #2c3e50;
+  --text-sub: #7f8c8d;
+  --border-color: #eaeaea;
+  --radius: 16px;
+  --shadow: 0 10px 30px rgba(0, 0, 0, 0.04);
+  --shadow-hover: 0 15px 35px rgba(255, 107, 0, 0.12);
+  --font-family: 'Outfit', 'Noto Sans JP', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: var(--font-family);
+  background-color: var(--bg-color);
+  color: var(--text-main);
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* レイアウト */
+.app-container {
+  max-width: 600px;
+  margin: 0 auto;
+  min-height: 100vh;
+  background-color: var(--card-bg);
+  box-shadow: 0 0 40px rgba(0, 0, 0, 0.03);
+  display: flex;
+  flex-direction: column;
+}
+
+/* ヘッダー */
+.header {
+  padding: 24px 20px;
+  text-align: center;
+  border-bottom: 1px solid var(--border-color);
+  background: white;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+
+.logo-text {
+  font-size: 26px;
+  font-weight: 800;
+  color: var(--primary-color);
+  letter-spacing: 0.5px;
+}
+
+.main-content {
+  flex: 1;
+  padding: 24px;
+  position: relative;
+}
+
+/* 管理画面モード */
+body.admin-mode .header {
+  position: static;
+  padding: 14px 20px;
+}
+
+body.admin-mode .logo-text {
+  font-size: 18px;
+}
+
+/* ステップ切り替えアニメーション */
+.step-section {
+  display: none;
+  animation: fadeInRight 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.step-section.active {
+  display: block;
+}
+
+@keyframes fadeInRight {
+  from {
+    opacity: 0;
+    transform: translateX(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+/* タイトルとヘッダー */
+.step-header {
+  display: flex;
+  align-items: center;
+  margin-bottom: 24px;
+}
+
+.back-btn {
+  background: none;
+  border: none;
+  color: var(--text-sub);
+  font-size: 14px;
+  cursor: pointer;
+  padding: 8px 12px 8px 0;
+  margin-right: 12px;
+  transition: all 0.2s;
+  font-weight: 600;
+}
+
+.back-btn:hover {
+  color: var(--primary-color);
+}
+
+.section-title {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--text-main);
+  letter-spacing: -0.2px;
+}
+
+.subsection-title {
+  font-size: 16px;
+  font-weight: 700;
+  margin-bottom: 12px;
+  color: var(--text-main);
+  margin-top: 12px;
+}
+
+/* 店舗一覧 */
+.store-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin-top: 12px;
+}
+
+.store-card {
+  background: white;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius);
+  padding: 20px;
+  text-align: left;
+  cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+  box-shadow: var(--shadow);
+}
+
+.store-card:hover {
+  border-color: var(--primary-color);
+  transform: translateY(-3px);
+  box-shadow: var(--shadow-hover);
+}
+
+.store-card h3 {
+  color: var(--primary-color);
+  font-size: 18px;
+  margin-bottom: 12px;
+  font-weight: 700;
+}
+
+.store-info-row {
+  font-size: 14px;
+  color: var(--text-main);
+  margin-bottom: 6px;
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.store-info-label {
+  font-weight: 600;
+  color: var(--text-sub);
+  min-width: 60px;
+}
+
+/* フォーム要素 */
+.form-group {
+  margin-bottom: 24px;
+}
+
+.form-group label {
+  display: block;
+  font-weight: 600;
+  margin-bottom: 8px;
+  font-size: 14px;
+}
+
+.badge {
+  background-color: #ff3b30;
+  color: white;
+  font-size: 10px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  margin-left: 8px;
+  vertical-align: middle;
+  font-weight: 600;
+}
+
+.form-control {
+  width: 100%;
+  padding: 14px;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  font-size: 16px;
+  font-family: inherit;
+  transition: all 0.2s;
+  background-color: var(--bg-color);
+  color: var(--text-main);
+}
+
+.form-control:focus {
+  outline: none;
+  border-color: var(--primary-color);
+  background-color: white;
+  box-shadow: 0 0 0 3px rgba(255, 107, 0, 0.1);
+}
+
+/* ボタン */
+.primary-btn {
+  width: 100%;
+  background: var(--primary-gradient);
+  color: white;
+  border: none;
+  padding: 16px;
+  border-radius: 30px;
+  font-size: 16px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+  box-shadow: 0 6px 20px rgba(255, 107, 0, 0.2);
+  display: block;
+  text-align: center;
+  text-decoration: none;
+}
+
+.primary-btn:hover:not(:disabled) {
+  background: linear-gradient(135deg, #ff944d 0%, #ff6b00 100%);
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-hover);
+}
+
+.primary-btn:active:not(:disabled) {
+  transform: translateY(0px);
+  box-shadow: none;
+}
+
+.primary-btn:disabled {
+  background: #e0e0e0;
+  color: #9e9e9e;
+  cursor: not-allowed;
+  box-shadow: none;
+  transform: none;
+  opacity: 0.7;
+}
+
+.primary-btn.outline {
+  background: transparent;
+  color: var(--primary-color);
+  border: 2px solid var(--primary-color);
+  box-shadow: none;
+}
+
+.primary-btn.outline:hover:not(:disabled) {
+  background: rgba(255, 107, 0, 0.05);
+  box-shadow: none;
+  transform: translateY(-1px);
+}
+
+/* 金額表示カード */
+.price-card {
+  background: linear-gradient(135deg, #fffaf5 0%, #ffffff 100%);
+  border: 1px solid #ffecd9;
+  border-radius: var(--radius);
+  padding: 24px;
+  margin-bottom: 24px;
+  box-shadow: var(--shadow);
+}
+
+.price-card h3 {
+  font-size: 15px;
+  margin-bottom: 12px;
+  color: var(--text-main);
+  font-weight: bold;
+}
+
+.price-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 14px;
+}
+
+.original-price {
+  text-decoration: line-through;
+  color: var(--text-sub);
+  font-size: 14px;
+}
+
+.campaign-price {
+  font-weight: 800;
+  font-size: 20px;
+  color: var(--primary-color);
+}
+
+.highlight {
+  font-size: 28px;
+}
+
+.campaign-memo-box {
+  background-color: #fff4ec;
+  border-left: 4px solid var(--primary-color);
+  padding: 12px;
+  border-radius: 6px;
+  font-size: 13px;
+  color: var(--text-main);
+}
+
+/* ラジオ・チェック */
+.radio-label,
+.checkbox-label {
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  padding: 16px;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  background: white;
+  transition: all 0.2s;
+  margin-bottom: 12px;
+}
+
+.radio-label:hover,
+.checkbox-label:hover {
+  border-color: var(--primary-color);
+  background-color: rgba(255, 107, 0, 0.02);
+}
+
+.radio-label input,
+.checkbox-label input {
+  margin-right: 12px;
+  transform: scale(1.2);
+  accent-color: var(--primary-color);
+}
+
+/* 利用規約 */
+.terms-box {
+  background-color: var(--bg-color);
+  padding: 16px;
+  border-radius: 8px;
+  height: 250px;
+  overflow-y: auto;
+  font-size: 13px;
+  color: var(--text-main);
+  margin-bottom: 16px;
+  border: 1px solid var(--border-color);
+  box-shadow: inset 0 2px 4px rgba(0,0,0,0.03);
+}
+
+/* 確認画面 */
+.summary-card {
+  background: var(--bg-color);
+  border-radius: var(--radius);
+  padding: 20px;
+  margin-bottom: 20px;
+}
+
+.summary-list dt {
+  font-size: 12px;
+  color: var(--text-sub);
+  margin-top: 12px;
+  font-weight: 600;
+}
+
+.summary-list dd {
+  font-size: 16px;
+  font-weight: 600;
+  border-bottom: 1px solid var(--border-color);
+  padding-bottom: 8px;
+  color: var(--text-main);
+}
+
+/* ローディング */
+.loading-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(255, 255, 255, 0.92);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  z-index: 999;
+}
+
+.spinner {
+  border: 4px solid #f3f3f3;
+  border-top: 4px solid var(--primary-color);
+  border-radius: 50%;
+  width: 44px;
+  height: 44px;
+  animation: spin 0.8s linear infinite;
+  margin-bottom: 16px;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+/* 1週間カレンダー */
+.weekly-nav {
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background-color: #f5f5f5;
+  padding: 10px;
+  border-radius: 8px;
+  margin-bottom: 0;
+  border: 1px solid var(--border-color);
+  border-bottom: 1px solid #ddd;
+}
+
+.weekly-nav h3 {
+  margin: 0;
+  font-size: 15px;
+  color: var(--text-main);
+  flex: 1;
+  text-align: center;
+  font-weight: 700;
+}
+
+.nav-btn {
+  background: none;
+  border: none;
+  color: var(--primary-color);
+  font-weight: 700;
+  cursor: pointer;
+  padding: 5px 10px;
+  flex: 0 0 80px;
+  text-align: center;
+  transition: opacity 0.2s;
+}
+
+.nav-btn:hover {
+  opacity: 0.7;
+}
+
+.weekly-grid-wrapper {
+  width: 100%;
+  max-height: 60vh;
+  overflow-x: auto;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  border: 1px solid var(--border-color);
+  border-top: none;
+  background-color: white;
+  border-radius: 0 0 8px 8px;
+}
+
+.weekly-grid {
+  display: flex;
+  min-width: 800px;
+}
+
+.wc-col {
+  flex: 1;
+  border-right: 1px solid #ddd;
+  display: flex;
+  flex-direction: column;
+}
+
+.wc-col:last-child {
+  border-right: none;
+}
+
+.wc-header {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  text-align: center;
+  padding: 10px 0;
+  font-weight: bold;
+  background-color: #1f2d3d;
+  color: white;
+  border-bottom: 1px solid #ddd;
+  font-size: 13px;
+}
+
+.wc-header.sat {
+  background-color: #007aff;
+}
+
+.wc-header.sun, .wc-header.holiday {
+  background-color: #ff3b30;
+}
+
+.wc-slot {
+  padding: 12px 10px;
+  border-bottom: 1px solid #eee;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  background: white;
+  align-items: center;
+}
+
+.wc-slot:last-child {
+  border-bottom: none;
+}
+
+.wc-time {
+  font-size: 12px;
+  font-weight: 700;
+  text-align: center;
+  color: var(--text-main);
+}
+
+.wc-remain {
+  font-size: 11px;
+  text-align: center;
+  margin-bottom: 4px;
+}
+
+.wc-remain.available {
+  background-color: #e8f5e9;
+  color: #2e7d32;
+  padding: 2px 8px;
+  border-radius: 4px;
+  display: inline-block;
+  font-weight: 600;
+}
+
+.wc-remain.unavailable {
+  background-color: #f5f5f5;
+  color: #9e9e9e;
+  padding: 2px 8px;
+  border-radius: 4px;
+  display: inline-block;
+}
+
+.wc-btn {
+  background: var(--primary-gradient);
+  color: white;
+  border: none;
+  border-radius: 6px;
+  padding: 8px 0;
+  font-size: 12px;
+  font-weight: bold;
+  cursor: pointer;
+  text-align: center;
+  width: 100%;
+  transition: all 0.2s;
+  box-shadow: 0 2px 6px rgba(255, 107, 0, 0.15);
+}
+
+.wc-btn:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(255, 107, 0, 0.25);
+}
+
+.wc-btn:disabled {
+  background: #e0e0e0;
+  color: #9e9e9e;
+  cursor: not-allowed;
+  box-shadow: none;
+  transform: none;
+}
+
+/* 完了カード */
+.finish-card {
+  text-align: center;
+  padding: 20px 0;
+}
+
+.booking-id-box {
+  background: #fff4ec;
+  padding: 20px;
+  border-radius: 12px;
+  margin: 24px 0;
+  border: 1px dashed var(--primary-color);
+}
+
+.booking-id-box p {
+  font-size: 14px;
+  color: var(--text-sub);
+  margin-bottom: 8px;
+  font-weight: bold;
+}
+
+.booking-id-box h3 {
+  color: var(--primary-color);
+  font-size: 26px;
+  letter-spacing: 2px;
+  font-weight: bold;
+}
+
+/* 休館日お知らせ */
+.holiday-alert {
+  background-color: #fff3cd;
+  color: #856404;
+  padding: 12px;
+  border-radius: 8px;
+  margin-bottom: 16px;
+  font-size: 14px;
+  border: 1px solid #ffeeba;
+  font-weight: 500;
+}
+
+/* Sticky Admin Actions */
+.sticky-admin-bar {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  background: #ffffff;
+  padding: 14px 20px;
+  margin: 0 -24px 20px -24px;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.sticky-admin-bar-header {
+  display: flex;
+  justify-content: space-between;
+  width: 100%;
+  align-items: center;
+}
+
+.sticky-admin-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+  align-items: center;
+  width: 100%;
+}
+
+.dirty-warning {
+  color: #e74c3c;
+  font-weight: bold;
+  font-size: 12px;
+  display: inline-block;
+  animation: pulse 2s infinite;
+  white-space: nowrap;
+}
+
+/* 曜日ブロック (管理画面) */
+.admin-day-block {
+  background: white;
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  padding: 20px;
+  margin-bottom: 16px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.01);
+}
+
+.admin-day-header {
+  font-weight: bold;
+  font-size: 16px;
+  margin-bottom: 14px;
+  color: var(--primary-color);
+  border-bottom: 1px dashed var(--border-color);
+  padding-bottom: 8px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.admin-time-row {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 10px;
+  align-items: center;
+}
+
+.admin-time-row label {
+  font-size: 12px;
+  width: 60px;
+  margin: 0;
+  color: var(--text-sub);
+  font-weight: bold;
+}
+
+.admin-time-row input {
+  flex: 1;
+  padding: 10px;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  font-family: inherit;
+  font-size: 14px;
+}
+
+.admin-checkbox {
+  font-size: 14px;
+  font-weight: normal;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* 管理画面カレンダー */
+.calendar-controls {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.calendar-controls button {
+  padding: 8px 16px;
+  background: white;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: 600;
+  font-family: inherit;
+  transition: all 0.2s;
+}
+
+.calendar-controls button:hover {
+  border-color: var(--primary-color);
+  color: var(--primary-color);
+}
+
+.admin-calendar-table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+  border: 1px solid var(--border-color);
+  background: white;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.admin-calendar-table th {
+  background: var(--bg-color);
+  padding: 10px;
+  text-align: center;
+  border: 1px solid var(--border-color);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.admin-calendar-table td {
+  border: 1px solid var(--border-color);
+  height: 70px;
+  vertical-align: top;
+  padding: 6px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.admin-calendar-table td:hover {
+  background-color: rgba(255, 107, 0, 0.03);
+}
+
+.admin-calendar-table td.today {
+  background-color: #fffaf0;
+  border: 2px solid var(--primary-color);
+}
+
+.admin-calendar-table td.selected {
+  background-color: #ffe6d5;
+}
+
+.admin-calendar-table td.empty-cell {
+  background-color: #faf9f6;
+  cursor: default;
+}
+
+.admin-calendar-table td.holiday-cell {
+  background-color: #fff2f2;
+}
+
+.cal-day-num {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-main);
+  margin-bottom: 4px;
+}
+
+.holiday-cell .cal-day-num {
+  color: #ff3b30;
+}
+
+.cal-booking-dots {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.cal-dot {
+  font-size: 9px;
+  padding: 1px 4px;
+  border-radius: 3px;
+  background-color: #ffe0cc;
+  color: var(--primary-color);
+  font-weight: bold;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+
+.admin-day-alert-badge {
+  font-size: 9px;
+  background: #ff3b30;
+  color: white;
+  padding: 1px 4px;
+  border-radius: 3px;
+  font-weight: bold;
+  text-align: center;
+}
+
+/* Tab Menu */
+.admin-tab-menu {
+  display: flex;
+  overflow-x: auto;
+  gap: 8px;
+  border-bottom: 2px solid var(--border-color);
+  margin-bottom: 20px;
+  padding-bottom: 4px;
+}
+
+.admin-tab-btn {
+  padding: 10px 16px;
+  background: transparent;
+  border: none;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-sub);
+  cursor: pointer;
+  white-space: nowrap;
+  border-bottom: 3px solid transparent;
+  transition: all 0.2s;
+  font-family: inherit;
+}
+
+.admin-tab-btn:hover {
+  color: var(--primary-color);
+}
+
+.admin-tab-btn.active {
+  color: var(--primary-color);
+  border-bottom-color: var(--primary-color);
+}
