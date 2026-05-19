@@ -53,7 +53,7 @@ async function createCalendarEvent(data: any, calendarId: string): Promise<strin
       calendarId,
       requestBody: {
         summary: title,
-        description: `電話番号: ${data.phone}\nメールアドレス: ${data.email}\n店舗: ${data.store}`,
+        description: `電話番号: ${data.phone}\nメールアドレス: ${data.email}\n店舗: ${data.store}\n備考: ${data.notes || 'なし'}`,
         start: { dateTime: startTimeStr, timeZone: 'Asia/Tokyo' },
         end: { dateTime: endTimeStr, timeZone: 'Asia/Tokyo' },
       },
@@ -98,15 +98,8 @@ async function sendConfirmationEmail(data: any, bookingId: string, storeInfo: an
     const mailItems = storeInfo?.メール持ち物 || config?.DEFAULT_EMAIL_ITEMS || '';
     const mailVisit = storeInfo?.メール来店案内 || config?.DEFAULT_EMAIL_VISIT || '';
     const planName = storeInfo?.プラン名 || config?.DEFAULT_PLAN_NAME || '体験トレーニング';
-    const campaignPrice = storeInfo?.キャンペーン価格 || config?.DEFAULT_CAMPAIGN_PRICE || '';
     const normalPrice = storeInfo?.通常価格 || config?.DEFAULT_NORMAL_PRICE || '';
-
-    let priceText = '';
-    if (!campaignPrice || campaignPrice === 'なし' || campaignPrice === '0') {
-      priceText = normalPrice;
-    } else {
-      priceText = campaignPrice;
-    }
+    const priceText = normalPrice;
 
     let body = `${data.name} 様\n\n` +
       `この度はFITABLEの無料体験にご予約いただき、誠にありがとうございます。\n` +
@@ -116,7 +109,8 @@ async function sendConfirmationEmail(data: any, bookingId: string, storeInfo: an
       `【店舗】 ${data.store}\n` +
       `【ご来店日時】 ${data.date} ${data.time}\n` +
       `【プラン】 ${planName}\n` +
-      `【料金】 ${priceText}\n\n` +
+      `【料金】 ${priceText}\n` +
+      (data.notes ? `【備考】\n${data.notes}\n\n` : `\n`) +
       `■店舗情報\n` +
       `【住所】 ${address}\n` +
       `【電話番号】 ${phone}\n`;
@@ -160,6 +154,7 @@ async function sendChatNotification(data: any, bookingId: string, webhookUrl: st
                `·お名前: ${data.name} 様 (${data.kana || ''})\n` +
                `・電話番号: ${data.phone || ''}\n` +
                `・メール: ${data.email || ''}${emailWarning}\n` +
+               `・備考: ${data.notes || 'なし'}\n` +
                `・予約番号: ${bookingId}`;
 
   try {
@@ -235,6 +230,7 @@ export async function POST(req: Request) {
         kana: data.kana || '',
         phone: data.phone,
         email: data.email,
+        notes: data.notes || '',
         store,
         date,
         time,

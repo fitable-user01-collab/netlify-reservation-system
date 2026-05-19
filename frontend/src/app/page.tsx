@@ -47,6 +47,7 @@ export default function BookingPage() {
   const [phone, setPhone] = useState<string>('');
   const [email, setEmail] = useState<string>('');
   const [emailConfirm, setEmailConfirm] = useState<string>('');
+  const [notes, setNotes] = useState<string>('');
   const [termsAgreed, setTermsAgreed] = useState<boolean>(false);
   const [itemsConfirmed, setItemsConfirmed] = useState<boolean>(false);
 
@@ -174,6 +175,7 @@ export default function BookingPage() {
           kana,
           phone,
           email,
+          notes,
         }),
       });
 
@@ -225,6 +227,15 @@ export default function BookingPage() {
 
   return (
     <>
+      {/* Header Banner Image (Placeholder for user's own image) */}
+      <div className="header-banner-container">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src="/images/header_banner.png" alt="FITABLE Premium Gym" onError={(e) => {
+          // If image doesn't exist yet, hide the container gracefully
+          (e.target as HTMLImageElement).style.display = 'none';
+        }} />
+      </div>
+
       {/* 1. 店舗選択画面 */}
       {step === 1 && (
         <section className="step-section active">
@@ -361,27 +372,12 @@ export default function BookingPage() {
             <h3>{planName}</h3>
             
             <div className="price-row">
-              {campaignPrice && campaignPrice !== 'なし' && campaignPrice !== '0' ? (
-                <>
-                  <div className="price-item">
-                    <span className="price-label">通常料金</span>
-                    <span className="original-price">{normalPrice}</span>
-                  </div>
-                  <div className="price-item">
-                    <span className="price-label highlight-label">体験キャンペーン料金</span>
-                    <span className="campaign-price">
-                      <span className="highlight">{campaignPrice}</span>
-                    </span>
-                  </div>
-                </>
-              ) : (
-                <div className="price-item">
-                  <span className="price-label">料金</span>
-                  <span className="campaign-price">
-                    <span className="highlight">{normalPrice}</span>
-                  </span>
-                </div>
-              )}
+              <div className="price-item">
+                <span className="price-label">料金</span>
+                <span className="campaign-price">
+                  <span className="highlight">{normalPrice}</span>
+                </span>
+              </div>
             </div>
 
             {campaignMemo && (
@@ -395,7 +391,7 @@ export default function BookingPage() {
             <label>お支払い方法</label>
             <div className="radio-label">
               <input type="radio" name="payment" value="onsite" checked readOnly />
-              <span>当日ジムにて精算（無料の場合は0円）</span>
+              <span>当日ジムにて精算</span>
             </div>
           </div>
 
@@ -479,6 +475,18 @@ export default function BookingPage() {
               />
             </div>
 
+            <div className="form-group">
+              <label htmlFor="notes">備考欄 (任意)</label>
+              <textarea
+                id="notes"
+                className="form-control"
+                rows={3}
+                placeholder="ケガや身体機能の心配など、事前に伝えておきたい事があればご記入ください。"
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+              />
+            </div>
+
             <div className="terms-box" style={{ whiteSpace: 'pre-wrap' }}>
               <h4>体験時利用規約</h4>
               <p>{termsText}</p>
@@ -519,6 +527,12 @@ export default function BookingPage() {
               <dd>{phone}</dd>
               <dt>メールアドレス</dt>
               <dd>{email}</dd>
+              {notes && (
+                <>
+                  <dt>備考</dt>
+                  <dd style={{ whiteSpace: 'pre-wrap', fontSize: '14px', fontWeight: 'normal' }}>{notes}</dd>
+                </>
+              )}
             </dl>
           </div>
 
@@ -530,7 +544,7 @@ export default function BookingPage() {
               <dt>ご来店日時</dt>
               <dd>{selectedDate} {selectedTime}</dd>
               <dt>ご予約プラン</dt>
-              <dd>{planName} ({campaignPrice && campaignPrice !== 'なし' && campaignPrice !== '0' ? campaignPrice : normalPrice})</dd>
+              <dd>{planName} ({normalPrice})</dd>
             </dl>
           </div>
 

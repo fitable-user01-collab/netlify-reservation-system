@@ -334,6 +334,49 @@ export default function AdminPage() {
   };
 
   // ==========================================
+  // CSVダウンロード処理
+  // ==========================================
+  const handleDownloadCSV = () => {
+    if (reservations.length === 0) {
+      alert('ダウンロードする予約データがありません。');
+      return;
+    }
+
+    // CSVヘッダー
+    const headers = ['予約日', '時間帯', '店舗', '氏名', 'フリガナ', '電話番号', 'メールアドレス', '備考', '予約番号', '受付日時'];
+    
+    // データ行の作成
+    const rows = reservations.map(r => [
+      r.date,
+      r.time,
+      selectedStore,
+      r.name,
+      r.kana,
+      r.phone,
+      r.email,
+      r.notes || '',
+      r.bookingId,
+      r.timestamp
+    ]);
+
+    // UTF-8 BOM付きCSVコンテンツを作成
+    const csvContent = '\uFEFF' + [
+      headers.join(','),
+      ...rows.map(row => row.map(item => `"${String(item).replace(/"/g, '""')}"`).join(','))
+    ].join('\n');
+
+    // ダウンロード実行
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.setAttribute('href', url);
+    link.setAttribute('download', `fitable_reservations_${selectedStore}_${yearMonth}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  // ==========================================
   // カレンダーセル計算関連
   // ==========================================
   const renderAdminCalendarCells = () => {
@@ -451,28 +494,70 @@ export default function AdminPage() {
     setIsDirtySettings(true);
   };
 
-  // 休日の追加
-  const addCustomHoliday = () => {
-    const datePattern = /^[0-9]{4}\/[0-9]{2}\/[0-9]{2}$/;
-    if (!datePattern.test(newHolidayInput)) {
-      alert('休館日は YYYY/MM/DD 形式で入力してください。 (例: 2026/05/20)');
-      return;
+  // 休日の切り替え（ビジュアルカレンダー用）
+  const toggleHoliday = (dateStr: string) => {
+    if (editHolidays.includes(dateStr)) {
+      setEditHolidays(editHolidays.filter(h => h !== dateStr));
+    } else {
+      setEditHolidays([...editHolidays, dateStr].sort());
     }
-
-    if (editHolidays.includes(newHolidayInput)) {
-      alert('その日はすでに休館日リストに存在します。');
-      return;
-    }
-
-    setEditHolidays([...editHolidays, newHolidayInput].sort());
-    setNewHolidayInput('');
     setIsDirtySettings(true);
   };
 
-  // 休日の削除
-  const removeCustomHoliday = (dateStr: string) => {
-    setEditHolidays(editHolidays.filter(h => h !== dateStr));
-    setIsDirtySettings(true);
+  const renderHolidayPicker = () => {
+    if (!yearMonth) return null;
+    const [year, month] = yearMonth.split('-').map(Number);
+    const firstDay = new Date(year, month - 1, 1);
+    const lastDay = new Date(year, month, 0);
+    const firstDayOfWeek = firstDay.getDay(); // 0 (日) ～ 6 (土)
+    const totalDays = lastDay.getDate();
+
+    const cells = [];
+    
+    // 最初の日までの空白
+    for (let i = 0; i < firstDayOfWeek; i++) {
+      cells.push(<div key={`empty-start-${i}`} className="holiday-picker-cell is-empty"></div>);
+    }
+
+    // 日付セル
+    for (let dayNum = 1; dayNum <= totalDays; dayNum++) {
+      const dateStr = `${year}/${String(month).padStart(2, '0')}/${String(dayNum).padStart(2, '0')}`;
+      const isHoliday = editHolidays.includes(dateStr);
+      cells.push(
+        <div
+          key={`holiday-cell-${dayNum}`}
+          className={`holiday-picker-cell ${isHoliday ? 'is-holiday' : ''}`}
+          onClick={() => toggleHoliday(dateStr)}
+        >
+          {dayNum}{isHoliday && <span style={{ fontSize: '10px', marginLeft: '2px' }}>(休)</span>}
+        </div>
+      );
+    }
+
+    // 最後の空枠（見た目を整えるため）
+    const remain = (7 - (cells.length % 7)) % 7;
+    for (let i = 0; i < remain; i++) {
+      cells.push(<div key={`empty-end-${i}`} className="holiday-picker-cell is-empty"></div>);
+    }
+
+    return (
+      <div style={{ maxWidth: '400px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+          <h4 style={{ fontSize: '14px', fontWeight: 'bold' }}>{year}年{month}月</h4>
+          <span style={{ fontSize: '12px', color: 'var(--text-sub)' }}>クリックで休館日を切替</span>
+        </div>
+        <div className="holiday-picker-calendar">
+          <div className="holiday-picker-header" style={{ color: '#ff3b30' }}>日</div>
+          <div className="holiday-picker-header">月</div>
+          <div className="holiday-picker-header">火</div>
+          <div className="holiday-picker-header">水</div>
+          <div className="holiday-picker-header">木</div>
+          <div className="holiday-picker-header">金</div>
+          <div className="holiday-picker-header" style={{ color: '#007aff' }}>土</div>
+          {cells}
+        </div>
+      </div>
+    );
   };
 
   // 店舗基本詳細情報の変更
@@ -585,46 +670,63 @@ export default function AdminPage() {
       <div className="sticky-admin-bar">
         <div className="sticky-admin-bar-header">
           <h2 className="section-title">
-            ⚙️ FITABLE 管理システム
+            ⚙️ FITABLE予約管理システム
           </h2>
-          <button
-            className="back-btn"
-            style={{ color: '#e74c3c' }}
-            onClick={() => {
-              setIsAuthorized(false);
-              setAuthPin('');
-              setPinInput('');
-            }}
-          >
-            ログアウト
-          </button>
         </div>
 
-        {/* 店舗切替ドロップダウン */}
-        <div className="sticky-admin-actions">
-          <label htmlFor="admin-store-select" style={{ fontSize: '13px', fontWeight: 'bold', color: 'var(--text-sub)' }}>
-            操作対象店舗:
-          </label>
-          <select
-            id="admin-store-select"
-            className="form-control"
-            style={{ width: '220px', padding: '8px', fontSize: '14px' }}
-            value={selectedStore}
-            onChange={(e) => handleStoreSwitch(e.target.value)}
-          >
-            {stores.map((s, idx) => (
-              <option key={idx} value={s.店舗名}>
-                {s.店舗名}
-              </option>
-            ))}
-          </select>
+        {/* 店舗切替ドロップダウン & グローバル保存/リセットボタン */}
+        <div className="sticky-admin-actions" style={{ justifyContent: 'space-between', padding: '0 4px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <label htmlFor="admin-store-select" style={{ fontSize: '14px', fontWeight: 'bold', color: 'var(--text-sub)' }}>
+              操作対象店舗
+            </label>
+            <select
+              id="admin-store-select"
+              className="form-control"
+              style={{ width: '240px', padding: '10px 14px', fontSize: '15px', fontWeight: 'bold', backgroundColor: '#fff4ec', border: '1px solid var(--primary-color)' }}
+              value={selectedStore}
+              onChange={(e) => handleStoreSwitch(e.target.value)}
+            >
+              {stores.map((s, idx) => (
+                <option key={idx} value={s.店舗名}>
+                  {s.店舗名}
+                </option>
+              ))}
+            </select>
+          </div>
 
-          {/* 未保存時の脈動警告バッジ */}
-          {dirtyFlag && (
-            <span className="dirty-warning">
-              ⚠️ 未保存の変更があります！
-            </span>
-          )}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            {/* 未保存時の脈動警告バッジ */}
+            {dirtyFlag && (
+              <span className="dirty-warning" style={{ marginRight: '8px' }}>
+                ⚠️ 未保存の変更あり
+              </span>
+            )}
+            
+            {/* カレンダータブ以外で共通保存・リセットボタンを表示 */}
+            {activeTab !== 'calendar' && (
+              <>
+                <button
+                  className="primary-btn outline"
+                  style={{ width: '80px', padding: '8px 0', fontSize: '13px' }}
+                  onClick={() => revertChanges(activeTab as any)}
+                >
+                  リセット
+                </button>
+                <button
+                  className="primary-btn"
+                  style={{ width: '120px', padding: '8px 0', fontSize: '13px' }}
+                  onClick={() => {
+                    if (activeTab === 'schedule') saveScheduleSettings();
+                    if (activeTab === 'stores') saveStoreBasicInfos();
+                    if (activeTab === 'system') saveSystemConfig();
+                  }}
+                >
+                  設定を保存
+                </button>
+              </>
+            )}
+          </div>
         </div>
       </div>
 
@@ -672,10 +774,17 @@ export default function AdminPage() {
                 setSelectedDate('');
               }}
             />
-            <h3 style={{ fontSize: '16px', fontWeight: 'bold' }}>
-              予約件数: {reservations.length} 件
-            </h3>
+            <button
+              className="csv-btn"
+              onClick={handleDownloadCSV}
+              disabled={reservations.length === 0}
+            >
+              📥 CSVダウンロード
+            </button>
           </div>
+          <h3 style={{ fontSize: '15px', fontWeight: 'bold', marginBottom: '12px', textAlign: 'right', color: 'var(--text-sub)' }}>
+            予約件数: <span style={{ color: 'var(--primary-color)', fontSize: '20px' }}>{reservations.length}</span> 件
+          </h3>
 
           <table className="admin-calendar-table">
             <thead>
@@ -726,6 +835,7 @@ export default function AdminPage() {
                       <span style={{ fontSize: '11px', color: 'var(--text-sub)', marginLeft: '8px' }}>({b.kana})</span>
                       <div style={{ fontSize: '12px', marginTop: '4px', color: '#666' }}>
                         📞 {b.phone} | ✉️ {b.email} <br />
+                        {b.notes && <span style={{ display: 'block', margin: '4px 0', padding: '4px 8px', background: '#fff4ec', borderRadius: '4px', color: 'var(--text-main)', borderLeft: '3px solid var(--primary-color)' }}>備考: {b.notes}</span>}
                         <span style={{ fontSize: '10px', color: '#999' }}>予約番号: {b.bookingId} (受付: {b.timestamp})</span>
                       </div>
                     </div>
@@ -833,58 +943,56 @@ export default function AdminPage() {
               🏖️ {selectedStore} カスタム休館日設定
             </h3>
 
-            <div className="form-group" style={{ display: 'flex', gap: '12px', alignItems: 'flex-end', marginBottom: '20px' }}>
-              <div style={{ flex: 1 }}>
-                <label>休館日の追加 (YYYY/MM/DD形式)</label>
-                <input
-                  type="text"
-                  className="form-control"
-                  placeholder="例: 2026/05/20"
-                  value={newHolidayInput}
-                  onChange={(e) => setNewHolidayInput(e.target.value)}
-                />
-              </div>
-              <button
-                type="button"
-                className="primary-btn"
-                style={{ width: '100px', height: '48px', padding: 0 }}
-                onClick={addCustomHoliday}
-              >
-                追加
-              </button>
-            </div>
-
-            <label style={{ display: 'block', fontWeight: 'bold', fontSize: '13px', marginBottom: '8px' }}>登録済みの休館日</label>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
-              {editHolidays.map((hDate, idx) => (
-                <div
-                  key={idx}
-                  style={{
-                    background: '#fff2f2',
-                    border: '1px solid #ffcccc',
-                    color: '#ff3b30',
-                    borderRadius: '20px',
-                    padding: '4px 12px',
-                    fontSize: '13px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '6px',
-                    fontWeight: 'bold'
-                  }}
-                >
-                  <span>{hDate}</span>
-                  <button
-                    type="button"
-                    style={{ background: 'none', border: 'none', color: '#ff3b30', cursor: 'pointer', fontWeight: 'bold', padding: '0 2px' }}
-                    onClick={() => removeCustomHoliday(hDate)}
-                  >
-                    ×
-                  </button>
+            <div style={{ display: 'flex', gap: '20px', alignItems: 'flex-start', flexWrap: 'wrap' }}>
+              <div style={{ flex: '1', minWidth: '300px' }}>
+                <div style={{ marginBottom: '12px' }}>
+                  <label style={{ fontSize: '14px', fontWeight: 'bold', display: 'block', marginBottom: '8px' }}>
+                    対象月: 
+                  </label>
+                  <input
+                    type="month"
+                    className="form-control"
+                    style={{ width: '200px', padding: '8px' }}
+                    value={yearMonth}
+                    onChange={(e) => setYearMonth(e.target.value)}
+                  />
                 </div>
-              ))}
-              {editHolidays.length === 0 && (
-                <p style={{ color: 'var(--text-sub)', fontSize: '13px', padding: '10px 0' }}>設定されている休館日日はありません。</p>
-              )}
+                {renderHolidayPicker()}
+              </div>
+              <div style={{ flex: '1', minWidth: '300px' }}>
+                <label style={{ display: 'block', fontWeight: 'bold', fontSize: '13px', marginBottom: '8px' }}>登録済みの休館日 (全月)</label>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', maxHeight: '200px', overflowY: 'auto', padding: '4px' }}>
+                  {editHolidays.map((hDate, idx) => (
+                    <div
+                      key={idx}
+                      style={{
+                        background: '#fff2f2',
+                        border: '1px solid #ffcccc',
+                        color: '#ff3b30',
+                        borderRadius: '20px',
+                        padding: '4px 12px',
+                        fontSize: '13px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        fontWeight: 'bold'
+                      }}
+                    >
+                      <span>{hDate}</span>
+                      <button
+                        type="button"
+                        style={{ background: 'none', border: 'none', color: '#ff3b30', cursor: 'pointer', fontWeight: 'bold', padding: '0 2px' }}
+                        onClick={() => toggleHoliday(hDate)}
+                      >
+                        ×
+                      </button>
+                    </div>
+                  ))}
+                  {editHolidays.length === 0 && (
+                    <p style={{ color: 'var(--text-sub)', fontSize: '13px', padding: '10px 0' }}>設定されている休館日はありません。</p>
+                  )}
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -895,27 +1003,14 @@ export default function AdminPage() {
         <div>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
             <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
-              <h3 style={{ fontSize: '16px', fontWeight: 'bold' }}>🏢 店舗情報詳細マスタ設定</h3>
-              <button
-                className="primary-btn outline"
-                style={{ width: '100px', padding: '4px 8px', fontSize: '12px', borderRadius: '6px' }}
-                onClick={addNewStore}
-              >
-                ＋ 店舗を追加
-              </button>
-            </div>
-            <div style={{ display: 'flex', gap: '8px' }}>
-              <button className="primary-btn outline" style={{ width: '80px', padding: '6px 12px', fontSize: '13px' }} onClick={() => revertChanges('stores')}>
-                リセット
-              </button>
-              <button className="primary-btn" style={{ width: '100px', padding: '6px 12px', fontSize: '13px' }} onClick={saveStoreBasicInfos}>
-                一括保存
-              </button>
+              <h3 style={{ fontSize: '16px', fontWeight: 'bold' }}>🏢 店舗情報詳細マスタ設定 ({selectedStore})</h3>
             </div>
           </div>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-            {editStores.map((s, sIdx) => (
+            {editStores.map((s, sIdx) => {
+              if (s.店舗名 !== selectedStore) return null;
+              return (
               <div
                 key={sIdx}
                 className="summary-card"
@@ -990,26 +1085,16 @@ export default function AdminPage() {
                   />
                 </div>
 
-                <div className="form-group" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                  <div>
-                    <label>通常価格</label>
-                    <input
-                      type="text"
-                      className="form-control"
-                      value={s.通常価格 || ''}
-                      onChange={(e) => handleStoreDetailChange(sIdx, '通常価格', e.target.value)}
-                    />
-                  </div>
-                  <div>
-                    <label>キャンペーン価格</label>
-                    <input
-                      type="text"
-                      className="form-control"
-                      value={s.キャンペーン価格 || ''}
-                      onChange={(e) => handleStoreDetailChange(sIdx, 'キャンペーン価格', e.target.value)}
-                    />
-                  </div>
+                <div className="form-group">
+                  <label>通常価格</label>
+                  <input
+                    type="text"
+                    className="form-control"
+                    value={s.通常価格 || ''}
+                    onChange={(e) => handleStoreDetailChange(sIdx, '通常価格', e.target.value)}
+                  />
                 </div>
+
 
                 <div className="form-group">
                   <label>価格キャンペーン備考欄</label>
@@ -1053,8 +1138,8 @@ export default function AdminPage() {
                     onChange={(e) => handleStoreDetailChange(sIdx, '利用規約', e.target.value)}
                   />
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       )}
@@ -1064,14 +1149,13 @@ export default function AdminPage() {
         <div>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
             <h3 style={{ fontSize: '16px', fontWeight: 'bold' }}>💻 システム全体共通設定</h3>
-            <div style={{ display: 'flex', gap: '8px' }}>
-              <button className="primary-btn outline" style={{ width: '80px', padding: '6px 12px', fontSize: '13px' }} onClick={() => revertChanges('system')}>
-                リセット
-              </button>
-              <button className="primary-btn" style={{ width: '100px', padding: '6px 12px', fontSize: '13px' }} onClick={saveSystemConfig}>
-                設定保存
-              </button>
-            </div>
+            <button
+              className="primary-btn outline"
+              style={{ width: '120px', padding: '6px 12px', fontSize: '13px', borderRadius: '6px' }}
+              onClick={addNewStore}
+            >
+              ＋ 新店舗を追加
+            </button>
           </div>
 
           <div className="summary-card" style={{ background: '#fff' }}>
@@ -1130,14 +1214,6 @@ export default function AdminPage() {
                   onChange={(e) => handleSystemConfigChange('DEFAULT_NORMAL_PRICE', e.target.value)}
                 />
               </div>
-              <div>
-                <label>共通デフォルトキャンペーン料金</label>
-                <input
-                  type="text"
-                  className="form-control"
-                  value={editGlobalConfig.DEFAULT_CAMPAIGN_PRICE || ''}
-                  onChange={(e) => handleSystemConfigChange('DEFAULT_CAMPAIGN_PRICE', e.target.value)}
-                />
               </div>
             </div>
 
@@ -1194,12 +1270,6 @@ export default function AdminPage() {
           <p>処理を実行中...</p>
         </div>
       )}
-      
-      <div className="text-center" style={{ margin: '40px 0 20px 0' }}>
-        <Link href="/" className="back-btn" style={{ margin: 0 }}>
-          ← 体験予約フロント画面へ戻る
-        </Link>
-      </div>
     </section>
   );
 }

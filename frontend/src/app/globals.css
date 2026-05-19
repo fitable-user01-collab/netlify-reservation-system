@@ -5,17 +5,17 @@
 @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Noto+Sans+JP:wght@400;500;700;900&display=swap');
 
 :root {
-  --primary-color: #ff6b00;
-  --primary-hover: #ff8533;
-  --primary-gradient: linear-gradient(135deg, #ff8533 0%, #ff5a00 100%);
-  --bg-color: #faf9f6;
+  --primary-color: #ff7a00;
+  --primary-hover: #ff9100;
+  --primary-gradient: linear-gradient(135deg, #ff9100 0%, #ff7a00 100%);
+  --bg-color: #faf8f5;
   --card-bg: #ffffff;
-  --text-main: #2c3e50;
-  --text-sub: #7f8c8d;
-  --border-color: #eaeaea;
+  --text-main: #2c2a29;
+  --text-sub: #76716e;
+  --border-color: #edebe9;
   --radius: 16px;
-  --shadow: 0 10px 30px rgba(0, 0, 0, 0.04);
-  --shadow-hover: 0 15px 35px rgba(255, 107, 0, 0.12);
+  --shadow: 0 4px 20px rgba(0, 0, 0, 0.02);
+  --shadow-hover: 0 10px 30px rgba(255, 122, 0, 0.08);
   --font-family: 'Outfit', 'Noto Sans JP', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
 }
 
@@ -622,6 +622,24 @@ body.admin-mode .logo-text {
   font-weight: 500;
 }
 
+/* User Screen Header Banner Image */
+.header-banner-container {
+  width: 100%;
+  max-width: 600px;
+  margin: 0 auto;
+  overflow: hidden;
+  background: white;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.header-banner-container img {
+  width: 100%;
+  height: auto;
+  display: block;
+  object-fit: cover;
+  max-height: 250px;
+}
+
 /* Sticky Admin Actions */
 .sticky-admin-bar {
   position: sticky;
@@ -666,10 +684,10 @@ body.admin-mode .logo-text {
 .admin-day-block {
   background: white;
   border: 1px solid var(--border-color);
-  border-radius: 12px;
-  padding: 20px;
-  margin-bottom: 16px;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.01);
+  border-radius: 8px;
+  padding: 12px 16px;
+  margin-bottom: 8px;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.01);
 }
 
 .admin-day-header {
@@ -700,12 +718,14 @@ body.admin-mode .logo-text {
 }
 
 .admin-time-row input {
-  flex: 1;
-  padding: 10px;
+  flex: none;
+  width: 70px;
+  padding: 6px;
   border: 1px solid var(--border-color);
   border-radius: 6px;
   font-family: inherit;
   font-size: 14px;
+  text-align: center;
 }
 
 .admin-checkbox {
@@ -856,6 +876,78 @@ body.admin-mode .logo-text {
 
 .admin-tab-btn:hover {
   color: var(--primary-color);
+}
+
+.admin-tab-btn.active {
+  color: var(--primary-color);
+  border-bottom: 3px solid var(--primary-color);
+}
+
+/* Holiday Picker Calendar */
+.holiday-picker-calendar {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 4px;
+  background: white;
+  border: 1px solid var(--border-color);
+  padding: 12px;
+  border-radius: 8px;
+}
+
+.holiday-picker-header {
+  text-align: center;
+  font-weight: bold;
+  font-size: 12px;
+  color: var(--text-sub);
+  padding-bottom: 4px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.holiday-picker-cell {
+  aspect-ratio: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  font-weight: 600;
+  border-radius: 6px;
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition: all 0.15s;
+}
+
+.holiday-picker-cell:hover {
+  background: rgba(255, 122, 0, 0.05);
+  border-color: #ffe6d5;
+}
+
+.holiday-picker-cell.is-holiday {
+  background: #fff2f2;
+  color: #ff3b30;
+  border-color: #ffcccc;
+}
+
+.holiday-picker-cell.is-empty {
+  cursor: default;
+  background: transparent;
+}
+
+.csv-btn {
+  background: #34c759;
+  color: white;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: bold;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.csv-btn:hover {
+  background: #2ebd4f;
 }
 
 .admin-tab-btn.active {
