@@ -29,28 +29,27 @@ export async function GET(req: Request) {
     const lastDay = new Date(year, month, 0).getDate();
     const endDateStr = `${year}/${String(month).padStart(2, '0')}/${String(lastDay).padStart(2, '0')}`;
 
-    // 3. Firestoreより予約状況を取得
+    // 3. Firestoreより予約状況を取得 (インデックスエラー防止のためメモリ内で日付・ステータスフィルタ)
     const bookingsSnapshot = await db
       .collection('bookings')
       .where('store', '==', store)
-      .where('status', '==', '予約確定')
-      .where('date', '>=', startDateStr)
-      .where('date', '<=', endDateStr)
       .get();
 
     const reservations: any[] = [];
     bookingsSnapshot.forEach(doc => {
       const data = doc.data();
-      reservations.push({
-        bookingId: doc.id,
-        timestamp: data.timestamp || '',
-        name: data.name || '',
-        kana: data.kana || '',
-        phone: data.phone || '',
-        email: data.email || '',
-        date: data.date || '',
-        time: data.time || ''
-      });
+      if (data.status === '予約確定' && data.date && data.date >= startDateStr && data.date <= endDateStr) {
+        reservations.push({
+          bookingId: doc.id,
+          timestamp: data.timestamp || '',
+          name: data.name || '',
+          kana: data.kana || '',
+          phone: data.phone || '',
+          email: data.email || '',
+          date: data.date || '',
+          time: data.time || ''
+        });
+      }
     });
 
     // 日付順・時間順にソートして返す

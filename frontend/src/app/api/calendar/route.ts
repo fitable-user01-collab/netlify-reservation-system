@@ -89,36 +89,31 @@ export async function GET(req: Request) {
       storeSettingsMap[doc.id] = doc.data();
     });
 
-    // 3. 店舗個別の休館日情報をFirestoreから取得
+    // 3. 店舗個別の休館日情報をFirestoreから取得 (インデックスエラー防止のためメモリ内で日付フィルタ)
     const holidaysSnapshot = await db
       .collection('holidays')
       .where('store', '==', store)
-      .where('date', '>=', startDateStr)
-      .where('date', '<=', endDateStr)
       .get();
     
     const storeHolidaysSet = new Set<string>();
     holidaysSnapshot.forEach(doc => {
       const data = doc.data();
-      if (data.date) {
+      if (data.date && data.date >= startDateStr && data.date <= endDateStr) {
         storeHolidaysSet.add(data.date);
       }
     });
 
-    // 4. 予約件数の確認
+    // 4. 予約件数の確認 (インデックスエラー防止のためメモリ内で日付・ステータスフィルタ)
     const bookingsSnapshot = await db
       .collection('bookings')
       .where('store', '==', store)
-      .where('status', '==', '予約確定')
-      .where('date', '>=', startDateStr)
-      .where('date', '<=', endDateStr)
       .get();
 
     // 予約状況マップを作成: { "2026/05/19": { "09:00～10:00": 1, ... } }
     const bookingCountsMap: Record<string, Record<string, number>> = {};
     bookingsSnapshot.forEach(doc => {
       const b = doc.data();
-      if (b.date && b.time) {
+      if (b.status === '予約確定' && b.date && b.time && b.date >= startDateStr && b.date <= endDateStr) {
         if (!bookingCountsMap[b.date]) {
           bookingCountsMap[b.date] = {};
         }
