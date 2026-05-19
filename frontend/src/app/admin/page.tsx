@@ -1136,7 +1136,8 @@ export default function AdminPage() {
                     onChange={(e) => handleStoreDetailChange(sIdx, '利用規約', e.target.value)}
                   />
                 </div>
-              );
+              </div>
+            );
             })}
           </div>
         </div>
@@ -1211,7 +1212,6 @@ export default function AdminPage() {
                   value={editGlobalConfig.DEFAULT_NORMAL_PRICE || ''}
                   onChange={(e) => handleSystemConfigChange('DEFAULT_NORMAL_PRICE', e.target.value)}
                 />
-              </div>
               </div>
             </div>
 
