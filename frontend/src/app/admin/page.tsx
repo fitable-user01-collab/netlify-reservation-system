@@ -50,7 +50,6 @@ export default function AdminPage() {
 
   const [holidays, setHolidays] = useState<string[]>([]);
   const [editHolidays, setEditHolidays] = useState<string[]>([]);
-  const [newHolidayInput, setNewHolidayInput] = useState<string>('');
 
   // 予約管理（カレンダー）関連
   const [reservations, setReservations] = useState<any[]>([]);
@@ -175,7 +174,6 @@ export default function AdminPage() {
     if (tabName === 'schedule') {
       setEditSettings(JSON.parse(JSON.stringify(settings)));
       setEditHolidays([...holidays]);
-      setNewHolidayInput('');
       setIsDirtySettings(false);
     } else if (tabName === 'stores') {
       setEditStores(JSON.parse(JSON.stringify(stores)));

@@ -221,7 +221,6 @@ export default function BookingPage() {
   const storeInfo = getSelectedStoreInfo();
   const planName = storeInfo?.プラン名 || globalConfig?.DEFAULT_PLAN_NAME || '体験トレーニング';
   const normalPrice = storeInfo?.通常価格 || globalConfig?.DEFAULT_NORMAL_PRICE || '';
-  const campaignPrice = storeInfo?.キャンペーン価格 || globalConfig?.DEFAULT_CAMPAIGN_PRICE || '';
   const campaignMemo = storeInfo?.キャンペーン備考 || globalConfig?.DEFAULT_CAMPAIGN_MEMO || '';
   const termsText = storeInfo?.利用規約 || globalConfig?.DEFAULT_TERMS || '第1条（目的）\n本規約は、当ジムの体験利用に関する条件を定めるものです。';
 
