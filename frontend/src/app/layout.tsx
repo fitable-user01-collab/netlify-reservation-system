@@ -1,5 +1,6 @@
 import './globals.css';
 import { Metadata } from 'next';
+import Header from './components/Header';
 
 export const metadata: Metadata = {
   title: 'FITABLE 体験予約システム',
@@ -16,9 +17,7 @@ export default function RootLayout({
     <html lang="ja">
       <body>
         <div className="app-container">
-          <header className="header">
-            <h1 className="logo-text">FITABLE 予約</h1>
-          </header>
+          <Header />
           <main className="main-content">
             {children}
           </main>
@@ -27,3 +26,4 @@ export default function RootLayout({
     </html>
   );
 }
+

@@ -46,7 +46,7 @@ body {
 
 /* ヘッダー */
 .header {
-  padding: 24px 20px;
+  padding: 16px 20px;
   text-align: center;
   border-bottom: 1px solid var(--border-color);
   background: white;
@@ -55,8 +55,30 @@ body {
   z-index: 100;
 }
 
+.logo-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+}
+
+.header-logo-image {
+  max-height: 40px;
+  width: auto;
+  display: block;
+  object-fit: contain;
+}
+
+.header-subtext {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-sub);
+  letter-spacing: 1px;
+}
+
 .logo-text {
-  font-size: 26px;
+  font-size: 24px;
   font-weight: 800;
   color: var(--primary-color);
   letter-spacing: 0.5px;

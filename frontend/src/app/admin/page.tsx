@@ -61,6 +61,9 @@ export default function AdminPage() {
   const [isDirtyStores, setIsDirtyStores] = useState<boolean>(false);
   const [isDirtySystem, setIsDirtySystem] = useState<boolean>(false);
 
+  // 店舗名変更追跡バッファ
+  const [storeRenames, setStoreRenames] = useState<{ [oldName: string]: string }>({});
+
   // 1. カレンダー初期日付の設定
   useEffect(() => {
     const d = new Date();
@@ -177,6 +180,7 @@ export default function AdminPage() {
       setIsDirtySettings(false);
     } else if (tabName === 'stores') {
       setEditStores(JSON.parse(JSON.stringify(stores)));
+      setStoreRenames({});
       setIsDirtyStores(false);
     } else if (tabName === 'system') {
       setEditGlobalConfig(JSON.parse(JSON.stringify(globalConfig)));
@@ -204,8 +208,14 @@ export default function AdminPage() {
   const handleStoreSwitch = (newStoreName: string) => {
     if (newStoreName === selectedStore) return;
 
+    if (isDirtySettings || isDirtyStores || isDirtySystem) {
+      const confirmSwitch = window.confirm('未保存の変更があります。保存せずに店舗を切り替えますか？ (変更内容は失われます)');
+      if (!confirmSwitch) return;
+    }
+
     if (isDirtySettings) revertChanges('schedule');
     if (isDirtyStores) revertChanges('stores');
+    if (isDirtySystem) revertChanges('system');
 
     setSelectedStore(newStoreName);
   };
@@ -254,13 +264,15 @@ export default function AdminPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           authPin,
-          stores: editStores
+          stores: editStores,
+          renames: storeRenames
         })
       });
       const data = await res.json();
       if (data.success) {
         alert('店舗情報を保存しました。');
         setStores(JSON.parse(JSON.stringify(editStores)));
+        setStoreRenames({});
         setIsDirtyStores(false);
       } else {
         alert(data.error || '保存に失敗しました。');
@@ -607,6 +619,53 @@ export default function AdminPage() {
     setIsDirtyStores(true);
   };
 
+  // 店舗名の編集（名前の変更）
+  const renameStorePrompt = (oldName: string) => {
+    // 未保存データがどこかにあれば、まず保存するよう警告してブロックする
+    if (isDirtySettings || isDirtyStores || isDirtySystem) {
+      alert('未保存の変更があります。店舗名を変更する前に、まず設定を保存してください。');
+      return;
+    }
+
+    const newName = window.prompt(`店舗 [${oldName}] の新しい名前を入力してください。`, oldName);
+    if (!newName || !newName.trim()) return;
+    const trimmed = newName.trim();
+    if (trimmed === oldName) return;
+
+    if (editStores.some(s => s.店舗名 === trimmed)) {
+      alert('すでに同じ名前の店舗が存在します。');
+      return;
+    }
+
+    // editStoresの店舗名を更新
+    const updated = editStores.map(s => {
+      if (s.店舗名 === oldName) {
+        return { ...s, 店舗名: trimmed };
+      }
+      return s;
+    });
+    setEditStores(updated);
+    setIsDirtyStores(true);
+
+    // 現在選択中の店舗名が変わった場合は selectedStore も更新する
+    if (selectedStore === oldName) {
+      setSelectedStore(trimmed);
+    }
+
+    // バックエンドマイグレーション用に変更履歴を記録
+    let originalName = oldName;
+    const renamesCopy = { ...storeRenames };
+    for (const [orig, curr] of Object.entries(renamesCopy)) {
+      if (curr === oldName) {
+        originalName = orig;
+        delete renamesCopy[orig];
+        break;
+      }
+    }
+    renamesCopy[originalName] = trimmed;
+    setStoreRenames(renamesCopy);
+  };
+
   // グローバルシステム設定の変更
   const handleSystemConfigChange = (key: string, val: string) => {
     setEditGlobalConfig({
@@ -666,18 +725,9 @@ export default function AdminPage() {
       
       {/* 1. 固定管理者コントロールヘッダー */}
       <div className="sticky-admin-bar">
-        <div className="sticky-admin-bar-header">
-          <h2 className="section-title">
-            ⚙️ FITABLE予約管理システム
-          </h2>
-        </div>
-
         {/* 店舗切替ドロップダウン & グローバル保存/リセットボタン */}
-        <div className="sticky-admin-actions" style={{ justifyContent: 'space-between', padding: '0 4px' }}>
+        <div className="sticky-admin-actions" style={{ justifyContent: 'space-between', padding: '0 4px', width: '100%' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <label htmlFor="admin-store-select" style={{ fontSize: '14px', fontWeight: 'bold', color: 'var(--text-sub)' }}>
-              操作対象店舗
-            </label>
             <select
               id="admin-store-select"
               className="form-control"
@@ -857,14 +907,6 @@ export default function AdminPage() {
         <div>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
             <h3 style={{ fontSize: '16px', fontWeight: 'bold' }}>⏰ {selectedStore} スケジュール枠設定</h3>
-            <div style={{ display: 'flex', gap: '8px' }}>
-              <button className="primary-btn outline" style={{ width: '80px', padding: '6px 12px', fontSize: '13px' }} onClick={() => revertChanges('schedule')}>
-                リセット
-              </button>
-              <button className="primary-btn" style={{ width: '100px', padding: '6px 12px', fontSize: '13px' }} onClick={saveScheduleSettings}>
-                設定保存
-              </button>
-            </div>
           </div>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
@@ -919,7 +961,7 @@ export default function AdminPage() {
                     </div>
 
                     <div className="admin-time-row">
-                      <label>同時受入枠数</label>
+                      <label>枠数</label>
                       <input
                         type="number"
                         min={1}
@@ -1018,13 +1060,6 @@ export default function AdminPage() {
                   <h4 style={{ fontSize: '16px', fontWeight: 'bold', color: 'var(--primary-color)' }}>
                     {s.店舗名} の詳細設定
                   </h4>
-                  <button
-                    className="primary-btn outline"
-                    style={{ width: '80px', padding: '4px 8px', fontSize: '12px', borderRadius: '6px', color: '#ff3b30', borderColor: '#ff3b30' }}
-                    onClick={() => deleteStore(s.店舗名)}
-                  >
-                    この店舗を削除
-                  </button>
                 </div>
 
                 <div className="form-group">
@@ -1052,6 +1087,7 @@ export default function AdminPage() {
                   <input
                     type="text"
                     className="form-control"
+                    placeholder="デフォルトを使用"
                     value={s.カレンダーID || ''}
                     onChange={(e) => handleStoreDetailChange(sIdx, 'カレンダーID', e.target.value)}
                   />
@@ -1065,6 +1101,7 @@ export default function AdminPage() {
                   <input
                     type="text"
                     className="form-control"
+                    placeholder="デフォルトを使用"
                     value={s.WebhookURL || ''}
                     onChange={(e) => handleStoreDetailChange(sIdx, 'WebhookURL', e.target.value)}
                   />
@@ -1078,6 +1115,7 @@ export default function AdminPage() {
                   <input
                     type="text"
                     className="form-control"
+                    placeholder="デフォルトを使用"
                     value={s.プラン名 || ''}
                     onChange={(e) => handleStoreDetailChange(sIdx, 'プラン名', e.target.value)}
                   />
@@ -1088,6 +1126,7 @@ export default function AdminPage() {
                   <input
                     type="text"
                     className="form-control"
+                    placeholder="デフォルトを使用"
                     value={s.通常価格 || ''}
                     onChange={(e) => handleStoreDetailChange(sIdx, '通常価格', e.target.value)}
                   />
@@ -1109,6 +1148,7 @@ export default function AdminPage() {
                   <textarea
                     rows={4}
                     className="form-control"
+                    placeholder="デフォルトを使用"
                     style={{ height: 'auto', fontFamily: 'monospace', fontSize: '14px' }}
                     value={s.メール持ち物 || ''}
                     onChange={(e) => handleStoreDetailChange(sIdx, 'メール持ち物', e.target.value)}
@@ -1120,6 +1160,7 @@ export default function AdminPage() {
                   <textarea
                     rows={4}
                     className="form-control"
+                    placeholder="デフォルトを使用"
                     style={{ height: 'auto', fontFamily: 'monospace', fontSize: '14px' }}
                     value={s.メール来店案内 || ''}
                     onChange={(e) => handleStoreDetailChange(sIdx, 'メール来店案内', e.target.value)}
@@ -1131,6 +1172,7 @@ export default function AdminPage() {
                   <textarea
                     rows={6}
                     className="form-control"
+                    placeholder="デフォルトを使用"
                     style={{ height: 'auto', fontFamily: 'monospace', fontSize: '13px' }}
                     value={s.利用規約 || ''}
                     onChange={(e) => handleStoreDetailChange(sIdx, '利用規約', e.target.value)}
@@ -1148,13 +1190,6 @@ export default function AdminPage() {
         <div>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
             <h3 style={{ fontSize: '16px', fontWeight: 'bold' }}>💻 システム全体共通設定</h3>
-            <button
-              className="primary-btn outline"
-              style={{ width: '120px', padding: '6px 12px', fontSize: '13px', borderRadius: '6px' }}
-              onClick={addNewStore}
-            >
-              ＋ 新店舗を追加
-            </button>
           </div>
 
           <div className="summary-card" style={{ background: '#fff' }}>
@@ -1257,6 +1292,61 @@ export default function AdminPage() {
                 onChange={(e) => handleSystemConfigChange('DEFAULT_TERMS', e.target.value)}
               />
             </div>
+          </div>
+
+          {/* 店舗の追加・名前の変更・削除画面 */}
+          <div className="summary-card mt-4" style={{ background: '#fff', border: '1px solid var(--border-color)' }}>
+            <h3 style={{ fontSize: '15px', color: 'var(--primary-color)', borderBottom: '2px solid var(--primary-color)', paddingBottom: '6px', marginBottom: '16px', fontWeight: 'bold' }}>
+              🏢 店舗の管理（追加・名前の変更・削除）
+            </h3>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '20px' }}>
+              {editStores.map((s, idx) => (
+                <div
+                  key={idx}
+                  style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    padding: '10px 14px',
+                    border: '1px solid var(--border-color)',
+                    borderRadius: '8px',
+                    background: '#faf9f6'
+                  }}
+                >
+                  <span style={{ fontWeight: 'bold', fontSize: '15px', color: 'var(--text-main)' }}>
+                    {s.店舗名}
+                  </span>
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    <button
+                      className="primary-btn outline"
+                      style={{ width: '70px', padding: '6px 0', fontSize: '12px', borderRadius: '6px' }}
+                      onClick={() => renameStorePrompt(s.店舗名)}
+                    >
+                      編集
+                    </button>
+                    <button
+                      className="primary-btn outline"
+                      style={{ width: '70px', padding: '6px 0', fontSize: '12px', borderRadius: '6px', color: '#ff3b30', borderColor: '#ff3b30' }}
+                      onClick={() => deleteStore(s.店舗名)}
+                    >
+                      削除
+                    </button>
+                  </div>
+                </div>
+              ))}
+              {editStores.length === 0 && (
+                <p style={{ color: 'var(--text-sub)', fontSize: '13px', padding: '10px 0' }}>登録されている店舗はありません。</p>
+              )}
+            </div>
+
+            <button
+              className="primary-btn outline"
+              style={{ maxWidth: '160px', padding: '10px 0', fontSize: '13px', borderRadius: '30px' }}
+              onClick={addNewStore}
+            >
+              ＋ 新規店舗追加
+            </button>
           </div>
         </div>
       )}

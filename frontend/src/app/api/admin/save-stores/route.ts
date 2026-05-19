@@ -3,7 +3,7 @@ import { db } from '@/lib/firebase';
 
 export async function POST(req: Request) {
   try {
-    const { authPin, stores } = await req.json();
+    const { authPin, stores, renames } = await req.json();
 
     if (!Array.isArray(stores)) {
       return NextResponse.json({ success: false, error: '店舗リストの形式が正しくありません。' }, { status: 400 });
@@ -19,7 +19,37 @@ export async function POST(req: Request) {
 
     const batch = db.batch();
 
-    // 2. 既存の全店舗リストを取得（削除対象を検出するため）
+    // 2. 店舗名の変更に伴うマイグレーション処理
+    if (renames && typeof renames === 'object') {
+      for (const [oldName, newName] of Object.entries(renames)) {
+        if (!oldName || !newName || oldName === newName) continue;
+
+        // A. 週間スケジュール設定の移行 (stores/{oldStoreName}/settings -> stores/{newStoreName}/settings)
+        const oldSettingsSnapshot = await db.collection('stores').doc(oldName).collection('settings').get();
+        for (const doc of oldSettingsSnapshot.docs) {
+          const data = doc.data();
+          const newSettingRef = db.collection('stores').doc(newName as string).collection('settings').doc(doc.id);
+          batch.set(newSettingRef, data);
+          // 旧設定を削除
+          const oldSettingRef = db.collection('stores').doc(oldName).collection('settings').doc(doc.id);
+          batch.delete(oldSettingRef);
+        }
+
+        // B. 休館日設定の移行 (holidays コレクション内の store フィールドの更新)
+        const holidaysSnapshot = await db.collection('holidays').where('store', '==', oldName).get();
+        for (const doc of holidaysSnapshot.docs) {
+          batch.update(doc.ref, { store: newName });
+        }
+
+        // C. 既存予約データの移行 (bookings コレクション内の store フィールドの更新)
+        const bookingsSnapshot = await db.collection('bookings').where('store', '==', oldName).get();
+        for (const doc of bookingsSnapshot.docs) {
+          batch.update(doc.ref, { store: newName });
+        }
+      }
+    }
+
+    // 3. 既存の全店舗リストを取得（削除対象を検出するため）
     const existingStoresSnapshot = await db.collection('stores').get();
     const existingStoreNames = existingStoresSnapshot.docs.map(doc => doc.id);
     const newStoreNames = new Set(stores.map((s: any) => s.店舗名).filter(Boolean));
