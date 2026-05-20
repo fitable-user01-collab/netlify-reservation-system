@@ -355,44 +355,76 @@ export default function AdminPage() {
   // ==========================================
   // CSVダウンロード処理
   // ==========================================
-  const handleDownloadCSV = () => {
-    if (reservations.length === 0) {
-      alert('ダウンロードする予約データがありません。');
+  // ==========================================
+  // CSVダウンロード処理 (全店舗・指定年月・キャンセル含む)
+  // ==========================================
+  const handleDownloadCSV = async () => {
+    const targetMonth = window.prompt('CSVをダウンロードする月を指定してください (形式: YYYY-MM):', yearMonth);
+    if (targetMonth === null) return; // キャンセル
+
+    if (!/^\d{4}-\d{2}$/.test(targetMonth)) {
+      alert('年月の形式が正しくありません。YYYY-MM形式 (例: 2026-05) で入力してください。');
       return;
     }
 
-    // CSVヘッダー
-    const headers = ['予約日', '時間帯', '店舗', '氏名', 'フリガナ', '電話番号', 'メールアドレス', '備考', '予約番号', '受付日時'];
-    
-    // データ行の作成
-    const rows = reservations.map(r => [
-      r.date,
-      r.time,
-      selectedStore,
-      r.name,
-      r.kana,
-      r.phone,
-      r.email,
-      r.notes || '',
-      r.bookingId,
-      r.timestamp
-    ]);
+    setLoading(true);
+    try {
+      const res = await fetch(`/api/admin/export-csv?yearMonth=${targetMonth}&authPin=${encodeURIComponent(authPin)}`);
+      if (!res.ok) {
+        throw new Error('データの取得に失敗しました。');
+      }
 
-    // UTF-8 BOM付きCSVコンテンツを作成
-    const csvContent = '\uFEFF' + [
-      headers.join(','),
-      ...rows.map(row => row.map(item => `"${String(item).replace(/"/g, '""')}"`).join(','))
-    ].join('\n');
+      const data = await res.json();
+      if (!data.success) {
+        alert(data.error || 'CSVデータの取得に失敗しました。');
+        return;
+      }
 
-    // ダウンロード実行
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.setAttribute('href', url);
-    link.setAttribute('download', `fitable_reservations_${selectedStore}_${yearMonth}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+      const list = data.reservations || [];
+      if (list.length === 0) {
+        alert(`${targetMonth}の予約データはありません。`);
+        return;
+      }
+
+      // CSVヘッダー
+      const headers = ['予約日', '時間帯', '店舗', '氏名', 'フリガナ', '電話番号', 'メールアドレス', '備考', '予約番号', '受付日時', 'ステータス'];
+      
+      // データ行の作成
+      const rows = list.map((r: any) => [
+        r.date,
+        r.time,
+        r.store,
+        r.name,
+        r.kana,
+        r.phone,
+        r.email,
+        r.notes || '',
+        r.bookingId,
+        r.timestamp,
+        r.status
+      ]);
+
+      // UTF-8 BOM付きCSVコンテンツを作成
+      const csvContent = '\uFEFF' + [
+        headers.join(','),
+        ...rows.map((row: any) => row.map((item: any) => `"${String(item).replace(/"/g, '""')}"`).join(','))
+      ].join('\n');
+
+      // ダウンロード実行
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.setAttribute('href', url);
+      link.setAttribute('download', `fitable_reservations_all_${targetMonth}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } catch (err: any) {
+      console.error(err);
+      alert('エラーが発生しました: ' + err.message);
+    } finally {
+      setLoading(false);
+    }
   };
 
   // ==========================================
@@ -834,9 +866,8 @@ export default function AdminPage() {
             <button
               className="csv-btn"
               onClick={handleDownloadCSV}
-              disabled={reservations.length === 0}
             >
-              📥 CSVダウンロード
+              📥 全店舗CSVダウンロード
             </button>
           </div>
           <h3 style={{ fontSize: '15px', fontWeight: 'bold', marginBottom: '12px', textAlign: 'right', color: 'var(--text-sub)' }}>

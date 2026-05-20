@@ -956,10 +956,10 @@ body.admin-mode .logo-text {
 
 .csv-btn {
   background: #34c759;
-  color: white;
+  color: #ffffff !important;
   border: none;
-  padding: 8px 16px;
-  border-radius: 6px;
+  padding: 8px 18px;
+  border-radius: 8px;
   font-size: 13px;
   font-weight: bold;
   cursor: pointer;
@@ -967,9 +967,16 @@ body.admin-mode .logo-text {
   display: flex;
   align-items: center;
   gap: 6px;
+  white-space: nowrap;
+  box-shadow: 0 2px 8px rgba(52, 199, 89, 0.3);
 }
 .csv-btn:hover {
-  background: #2ebd4f;
+  background: #2aad4d;
+  box-shadow: 0 4px 14px rgba(52, 199, 89, 0.4);
+  transform: translateY(-1px);
+}
+.csv-btn:active {
+  transform: translateY(0);
 }
 
 .admin-tab-btn.active {
