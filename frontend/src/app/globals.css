@@ -955,28 +955,25 @@ body.admin-mode .logo-text {
 }
 
 .csv-btn {
-  background: #34c759;
-  color: #ffffff !important;
-  border: none;
+  background: #ffffff;
+  color: var(--primary-color) !important;
+  border: 2px solid var(--primary-color);
   padding: 8px 18px;
   border-radius: 8px;
   font-size: 13px;
   font-weight: bold;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: opacity 0.2s;
   display: flex;
   align-items: center;
   gap: 6px;
   white-space: nowrap;
-  box-shadow: 0 2px 8px rgba(52, 199, 89, 0.3);
 }
 .csv-btn:hover {
-  background: #2aad4d;
-  box-shadow: 0 4px 14px rgba(52, 199, 89, 0.4);
-  transform: translateY(-1px);
+  opacity: 0.75;
 }
 .csv-btn:active {
-  transform: translateY(0);
+  opacity: 0.6;
 }
 
 .admin-tab-btn.active {
