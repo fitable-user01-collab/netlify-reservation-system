@@ -226,15 +226,6 @@ export default function BookingPage() {
 
   return (
     <>
-      {/* Header Banner Image (Placeholder for user's own image) */}
-      <div className="header-banner-container">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src="/images/header_banner.png" alt="FITABLE Premium Gym" onError={(e) => {
-          // If image doesn't exist yet, hide the container gracefully
-          (e.target as HTMLImageElement).style.display = 'none';
-        }} />
-      </div>
-
       {/* 1. 店舗選択画面 */}
       {step === 1 && (
         <section className="step-section active">

@@ -726,12 +726,12 @@ export default function AdminPage() {
       {/* 1. 固定管理者コントロールヘッダー */}
       <div className="sticky-admin-bar">
         {/* 店舗切替ドロップダウン & グローバル保存/リセットボタン */}
-        <div className="sticky-admin-actions" style={{ justifyContent: 'space-between', padding: '0 4px', width: '100%' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+        <div className="sticky-admin-actions" style={{ justifyContent: 'space-between', padding: '0 4px', width: '100%', gap: '16px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flex: 1 }}>
             <select
               id="admin-store-select"
               className="form-control"
-              style={{ width: '240px', padding: '10px 14px', fontSize: '15px', fontWeight: 'bold', backgroundColor: '#fff4ec', border: '1px solid var(--primary-color)' }}
+              style={{ width: '100%', padding: '10px 14px', fontSize: '15px', fontWeight: 'bold', backgroundColor: '#fff4ec', border: '1px solid var(--primary-color)' }}
               value={selectedStore}
               onChange={(e) => handleStoreSwitch(e.target.value)}
             >
@@ -906,7 +906,7 @@ export default function AdminPage() {
       {activeTab === 'schedule' && (
         <div>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-            <h3 style={{ fontSize: '16px', fontWeight: 'bold' }}>⏰ {selectedStore} スケジュール枠設定</h3>
+            <h3 style={{ fontSize: '16px', fontWeight: 'bold' }}>⏰ スケジュール枠設定</h3>
           </div>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
@@ -980,7 +980,7 @@ export default function AdminPage() {
           {/* 休日管理セクション */}
           <div className="summary-card mt-4" style={{ background: '#fff' }}>
             <h3 style={{ fontSize: '15px', color: 'var(--primary-color)', borderBottom: '2px solid var(--primary-color)', paddingBottom: '6px', marginBottom: '16px' }}>
-              🏖️ {selectedStore} カスタム休館日設定
+              🏖️ カスタム休館日設定
             </h3>
 
             <div style={{ display: 'flex', gap: '20px', alignItems: 'flex-start', flexWrap: 'wrap' }}>
@@ -1043,7 +1043,7 @@ export default function AdminPage() {
         <div>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
             <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
-              <h3 style={{ fontSize: '16px', fontWeight: 'bold' }}>🏢 店舗情報詳細マスタ設定 ({selectedStore})</h3>
+              <h3 style={{ fontSize: '16px', fontWeight: 'bold' }}>🏢 店舗情報詳細マスタ設定</h3>
             </div>
           </div>
 
@@ -1138,6 +1138,7 @@ export default function AdminPage() {
                   <input
                     type="text"
                     className="form-control"
+                    placeholder="デフォルトを使用"
                     value={s.キャンペーン備考 || ''}
                     onChange={(e) => handleStoreDetailChange(sIdx, 'キャンペーン備考', e.target.value)}
                   />
