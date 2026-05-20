@@ -1,10 +1,19 @@
 'use client';
 
 import { usePathname } from 'next/navigation';
+import { useEffect } from 'react';
 
 export default function Header() {
   const pathname = usePathname();
   const isAdmin = pathname?.startsWith('/admin');
+
+  useEffect(() => {
+    if (isAdmin) {
+      document.body.classList.add('admin-mode');
+    } else {
+      document.body.classList.remove('admin-mode');
+    }
+  }, [isAdmin]);
 
   if (isAdmin) {
     return (

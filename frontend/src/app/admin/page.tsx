@@ -188,11 +188,20 @@ export default function AdminPage() {
     }
   };
 
-  // タブの切り替え (切り替え時に未保存データを自動リバート)
+  // タブの切り替え (切り替え時に未保存データの確認を行う)
   const handleTabSwitch = (newTab: string) => {
     if (newTab === activeTab) return;
 
-    // 未保存の変更があれば自動で破棄する
+    const hasDirty = (activeTab === 'schedule' && isDirtySettings) ||
+                     (activeTab === 'stores' && isDirtyStores) ||
+                     (activeTab === 'system' && isDirtySystem);
+
+    if (hasDirty) {
+      const confirmSwitch = window.confirm('未保存の変更があります。保存せずに画面を切り替えますか？ (変更内容は失われます)');
+      if (!confirmSwitch) return;
+    }
+
+    // ユーザーが同意したか、または変更がない場合はリバートして切り替え
     if (activeTab === 'schedule' && isDirtySettings) {
       revertChanges('schedule');
     } else if (activeTab === 'stores' && isDirtyStores) {
