@@ -740,13 +740,14 @@ body.admin-mode .logo-text {
 }
 
 .admin-time-row input {
-  flex: none;
-  width: 70px;
-  padding: 6px;
+  flex: 1;
+  max-width: 140px;
+  min-width: 100px;
+  padding: 8px;
   border: 1px solid var(--border-color);
   border-radius: 6px;
   font-family: inherit;
-  font-size: 14px;
+  font-size: 15px;
   text-align: center;
 }
 

@@ -217,7 +217,7 @@ export default function AdminPage() {
   const handleTabSwitch = (newTab: string) => {
     if (newTab === activeTab) return;
 
-    const hasDirty = (activeTab === 'schedule' && isDirtySettings) ||
+    const hasDirty = ((activeTab === 'hours' || activeTab === 'holidays') && isDirtySettings) ||
                      (activeTab === 'stores' && isDirtyStores) ||
                      (activeTab === 'system' && isDirtySystem);
 
@@ -227,7 +227,7 @@ export default function AdminPage() {
     }
 
     // ユーザーが同意したか、または変更がない場合はリバートして切り替え
-    if (activeTab === 'schedule' && isDirtySettings) {
+    if ((activeTab === 'hours' || activeTab === 'holidays') && isDirtySettings) {
       revertChanges('schedule');
     } else if (activeTab === 'stores' && isDirtyStores) {
       revertChanges('stores');
@@ -270,7 +270,7 @@ export default function AdminPage() {
 
     const newSetting: SpecialScheduleSetting = {
       date: specialDate,
-      active: specialActive,
+      active: true,
       start: specialStart,
       end: specialEnd,
       breakStart: specialBreakStart,
@@ -821,7 +821,7 @@ export default function AdminPage() {
 
   // 認証後の本体画面
   const selectedDateBookings = reservations.filter(r => r.date === selectedDate);
-  const dirtyFlag = (activeTab === 'schedule' && isDirtySettings) ||
+  const dirtyFlag = ((activeTab === 'hours' || activeTab === 'holidays') && isDirtySettings) ||
                      (activeTab === 'stores' && isDirtyStores) ||
                      (activeTab === 'system' && isDirtySystem);
 
@@ -862,7 +862,13 @@ export default function AdminPage() {
                 <button
                   className="primary-btn outline"
                   style={{ width: '80px', padding: '8px 0', fontSize: '13px' }}
-                  onClick={() => revertChanges(activeTab as any)}
+                  onClick={() => {
+                    if (activeTab === 'hours' || activeTab === 'holidays') {
+                      revertChanges('schedule');
+                    } else {
+                      revertChanges(activeTab);
+                    }
+                  }}
                 >
                   リセット
                 </button>
@@ -870,7 +876,7 @@ export default function AdminPage() {
                   className="primary-btn"
                   style={{ width: '120px', padding: '8px 0', fontSize: '13px' }}
                   onClick={() => {
-                    if (activeTab === 'schedule') saveScheduleSettings();
+                    if (activeTab === 'hours' || activeTab === 'holidays') saveScheduleSettings();
                     if (activeTab === 'stores') saveStoreBasicInfos();
                     if (activeTab === 'system') {
                       saveSystemConfig();
@@ -892,13 +898,19 @@ export default function AdminPage() {
           className={`admin-tab-btn ${activeTab === 'calendar' ? 'active' : ''}`}
           onClick={() => handleTabSwitch('calendar')}
         >
-          📅 予約カレンダー
+          📅 予約状況
         </button>
         <button
-          className={`admin-tab-btn ${activeTab === 'schedule' ? 'active' : ''}`}
-          onClick={() => handleTabSwitch('schedule')}
+          className={`admin-tab-btn ${activeTab === 'hours' ? 'active' : ''}`}
+          onClick={() => handleTabSwitch('hours')}
         >
-          ⏰ スケジュール枠・休日
+          ⏰ 営業時間設定
+        </button>
+        <button
+          className={`admin-tab-btn ${activeTab === 'holidays' ? 'active' : ''}`}
+          onClick={() => handleTabSwitch('holidays')}
+        >
+          🏖️ 休館日・特別日設定
         </button>
         <button
           className={`admin-tab-btn ${activeTab === 'stores' ? 'active' : ''}`}
@@ -1009,8 +1021,83 @@ export default function AdminPage() {
         </div>
       )}
 
-      {/* タブB. 枠設定 & 休日管理 */}
-      {activeTab === 'schedule' && (
+      {/* タブB-1. 営業時間設定 (曜日別) */}
+      {activeTab === 'hours' && (
+        <div>
+          {/* デフォルトの営業時間設定 (曜日別) */}
+          <div className="summary-card" style={{ background: '#fff', marginBottom: '24px' }}>
+            <h3 style={{ fontSize: '15px', color: 'var(--primary-color)', borderBottom: '2px solid var(--primary-color)', paddingBottom: '6px', marginBottom: '16px', fontWeight: 'bold' }}>
+              ⏰ デフォルトの営業時間設定（曜日別）
+            </h3>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              {editSettings.map((set, idx) => (
+                <div className="admin-day-block" key={idx}>
+                  <div className="admin-day-header">
+                    <span>{set.day === '祝' ? '祝日' : `${set.day}曜日`}の設定</span>
+                    <label className="admin-checkbox">
+                      <input
+                        type="checkbox"
+                        checked={set.active}
+                        onChange={(e) => handleSettingActiveChange(idx, e.target.checked)}
+                      />
+                      <span>営業する</span>
+                    </label>
+                  </div>
+
+                  {set.active && (
+                    <div>
+                      <div className="admin-time-row">
+                        <label>営業時間</label>
+                        <input
+                          type="time"
+                          value={set.start}
+                          onChange={(e) => handleSettingTimeChange(idx, 'start', e.target.value)}
+                        />
+                        <span>～</span>
+                        <input
+                          type="time"
+                          value={set.end}
+                          onChange={(e) => handleSettingTimeChange(idx, 'end', e.target.value)}
+                        />
+                      </div>
+
+                      <div className="admin-time-row">
+                        <label>休憩時間</label>
+                        <input
+                          type="time"
+                          value={set.breakStart}
+                          onChange={(e) => handleSettingTimeChange(idx, 'breakStart', e.target.value)}
+                        />
+                        <span>～</span>
+                        <input
+                          type="time"
+                          value={set.breakEnd}
+                          onChange={(e) => handleSettingTimeChange(idx, 'breakEnd', e.target.value)}
+                        />
+                      </div>
+
+                      <div className="admin-time-row">
+                        <label>枠数</label>
+                        <input
+                          type="number"
+                          min={1}
+                          max={10}
+                          value={set.maxSlots}
+                          onChange={(e) => handleSettingMaxSlotsChange(idx, parseInt(e.target.value, 10) || 1)}
+                        />
+                        <span style={{ fontSize: '12px', color: 'var(--text-sub)' }}>名まで同時に体験予約可</span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* タブB-2. 休館日・特別日設定 */}
+      {activeTab === 'holidays' && (
         <div>
           {/* 休日管理セクション (休館日設定を上に配置) */}
           <div className="summary-card" style={{ background: '#fff', marginBottom: '24px' }}>
@@ -1094,77 +1181,62 @@ export default function AdminPage() {
                 </div>
 
                 <div style={{ marginBottom: '12px' }}>
-                  <label style={{ fontSize: '13px', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
-                    <input
-                      type="checkbox"
-                      checked={specialActive}
-                      onChange={(e) => setSpecialActive(e.target.checked)}
-                    />
-                    <span>この日は営業する</span>
-                  </label>
+                  <label style={{ fontSize: '13px', fontWeight: 'bold', display: 'block', marginBottom: '6px' }}>枠数 (最大同時予約人数)</label>
+                  <input
+                    type="number"
+                    className="form-control"
+                    min={1}
+                    max={10}
+                    style={{ width: '100%', padding: '8px' }}
+                    value={specialMaxSlots}
+                    onChange={(e) => setSpecialMaxSlots(parseInt(e.target.value, 10) || 1)}
+                  />
                 </div>
-
-                {specialActive && (
-                  <div style={{ marginBottom: '12px' }}>
-                    <label style={{ fontSize: '13px', fontWeight: 'bold', display: 'block', marginBottom: '6px' }}>枠数 (最大同時予約人数)</label>
-                    <input
-                      type="number"
-                      className="form-control"
-                      min={1}
-                      max={10}
-                      style={{ width: '100%', padding: '8px' }}
-                      value={specialMaxSlots}
-                      onChange={(e) => setSpecialMaxSlots(parseInt(e.target.value, 10) || 1)}
-                    />
-                  </div>
-                )}
               </div>
 
-              {specialActive && (
-                <div style={{ flex: '1', minWidth: '250px' }}>
-                  <div style={{ marginBottom: '12px' }}>
-                    <label style={{ fontSize: '13px', fontWeight: 'bold', display: 'block', marginBottom: '6px' }}>営業時間</label>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <input
-                        type="time"
-                        className="form-control"
-                        style={{ padding: '8px', flex: 1 }}
-                        value={specialStart}
-                        onChange={(e) => setSpecialStart(e.target.value)}
-                      />
-                      <span>～</span>
-                      <input
-                        type="time"
-                        className="form-control"
-                        style={{ padding: '8px', flex: 1 }}
-                        value={specialEnd}
-                        onChange={(e) => setSpecialEnd(e.target.value)}
-                      />
-                    </div>
-                  </div>
-
-                  <div style={{ marginBottom: '12px' }}>
-                    <label style={{ fontSize: '13px', fontWeight: 'bold', display: 'block', marginBottom: '6px' }}>休憩時間</label>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <input
-                        type="time"
-                        className="form-control"
-                        style={{ padding: '8px', flex: 1 }}
-                        value={specialBreakStart}
-                        onChange={(e) => setSpecialBreakStart(e.target.value)}
-                      />
-                      <span>～</span>
-                      <input
-                        type="time"
-                        className="form-control"
-                        style={{ padding: '8px', flex: 1 }}
-                        value={specialBreakEnd}
-                        onChange={(e) => setSpecialBreakEnd(e.target.value)}
-                      />
-                    </div>
+              <div style={{ flex: '1', minWidth: '250px' }}>
+                <div style={{ marginBottom: '12px' }}>
+                  <label style={{ fontSize: '13px', fontWeight: 'bold', display: 'block', marginBottom: '6px' }}>営業時間</label>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <input
+                      type="time"
+                      className="form-control"
+                      style={{ padding: '8px', flex: 1 }}
+                      value={specialStart}
+                      onChange={(e) => setSpecialStart(e.target.value)}
+                    />
+                    <span>～</span>
+                    <input
+                      type="time"
+                      className="form-control"
+                      style={{ padding: '8px', flex: 1 }}
+                      value={specialEnd}
+                      onChange={(e) => setSpecialEnd(e.target.value)}
+                    />
                   </div>
                 </div>
-              )}
+
+                <div style={{ marginBottom: '12px' }}>
+                  <label style={{ fontSize: '13px', fontWeight: 'bold', display: 'block', marginBottom: '6px' }}>休憩時間</label>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <input
+                      type="time"
+                      className="form-control"
+                      style={{ padding: '8px', flex: 1 }}
+                      value={specialBreakStart}
+                      onChange={(e) => setSpecialBreakStart(e.target.value)}
+                    />
+                    <span>～</span>
+                    <input
+                      type="time"
+                      className="form-control"
+                      style={{ padding: '8px', flex: 1 }}
+                      value={specialBreakEnd}
+                      onChange={(e) => setSpecialBreakEnd(e.target.value)}
+                    />
+                  </div>
+                </div>
+              </div>
 
               <div style={{ width: '100%', display: 'flex', justifyContent: 'flex-end', marginTop: '8px' }}>
                 <button
@@ -1190,23 +1262,19 @@ export default function AdminPage() {
                       justifyContent: 'space-between',
                       alignItems: 'center',
                       padding: '10px 16px',
-                      background: spec.active ? '#f0f9ff' : '#f3f4f6',
-                      border: spec.active ? '1px solid #bae6fd' : '1px solid #e5e7eb',
+                      background: '#f0f9ff',
+                      border: '1px solid #bae6fd',
                       borderRadius: '8px',
                       fontSize: '13px'
                     }}
                   >
                     <div>
-                      <strong style={{ fontSize: '14px', marginRight: '12px', color: spec.active ? '#0369a1' : '#4b5563' }}>
+                      <strong style={{ fontSize: '14px', marginRight: '12px', color: '#0369a1' }}>
                         📅 {spec.date}
                       </strong>
-                      {spec.active ? (
-                        <span>
-                          営業中 ({spec.start}～{spec.end} / 休憩: {spec.breakStart}～{spec.breakEnd} / 枠数: {spec.maxSlots}名)
-                        </span>
-                      ) : (
-                        <span style={{ color: '#ff3b30', fontWeight: 'bold' }}>終日休業 (特別営業外)</span>
-                      )}
+                      <span>
+                        営業中 ({spec.start}～{spec.end} / 休憩: {spec.breakStart}～{spec.breakEnd} / 枠数: {spec.maxSlots}名)
+                      </span>
                     </div>
                     <button
                       type="button"
@@ -1222,76 +1290,6 @@ export default function AdminPage() {
                   <p style={{ color: 'var(--text-sub)', fontSize: '13px', padding: '10px 0' }}>登録されている特別スケジュールはありません。</p>
                 )}
               </div>
-            </div>
-          </div>
-
-          {/* デフォルトの営業時間設定 (曜日別) */}
-          <div className="summary-card" style={{ background: '#fff', marginBottom: '24px' }}>
-            <h3 style={{ fontSize: '15px', color: 'var(--primary-color)', borderBottom: '2px solid var(--primary-color)', paddingBottom: '6px', marginBottom: '16px', fontWeight: 'bold' }}>
-              ⏰ デフォルトの営業時間設定（曜日別）
-            </h3>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-              {editSettings.map((set, idx) => (
-                <div className="admin-day-block" key={idx}>
-                  <div className="admin-day-header">
-                    <span>{set.day === '祝' ? '祝日' : `${set.day}曜日`}の設定</span>
-                    <label className="admin-checkbox">
-                      <input
-                        type="checkbox"
-                        checked={set.active}
-                        onChange={(e) => handleSettingActiveChange(idx, e.target.checked)}
-                      />
-                      <span>営業する</span>
-                    </label>
-                  </div>
-
-                  {set.active && (
-                    <div>
-                      <div className="admin-time-row">
-                        <label>営業時間</label>
-                        <input
-                          type="time"
-                          value={set.start}
-                          onChange={(e) => handleSettingTimeChange(idx, 'start', e.target.value)}
-                        />
-                        <span>～</span>
-                        <input
-                          type="time"
-                          value={set.end}
-                          onChange={(e) => handleSettingTimeChange(idx, 'end', e.target.value)}
-                        />
-                      </div>
-
-                      <div className="admin-time-row">
-                        <label>休憩時間</label>
-                        <input
-                          type="time"
-                          value={set.breakStart}
-                          onChange={(e) => handleSettingTimeChange(idx, 'breakStart', e.target.value)}
-                        />
-                        <span>～</span>
-                        <input
-                          type="time"
-                          value={set.breakEnd}
-                          onChange={(e) => handleSettingTimeChange(idx, 'breakEnd', e.target.value)}
-                        />
-                      </div>
-
-                      <div className="admin-time-row">
-                        <label>枠数</label>
-                        <input
-                          type="number"
-                          min={1}
-                          max={10}
-                          value={set.maxSlots}
-                          onChange={(e) => handleSettingMaxSlotsChange(idx, parseInt(e.target.value, 10) || 1)}
-                        />
-                        <span style={{ fontSize: '12px', color: 'var(--text-sub)' }}>名まで同時に体験予約可</span>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              ))}
             </div>
           </div>
         </div>
