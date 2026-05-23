@@ -3,6 +3,7 @@ import { supabase } from '@/lib/supabase';
 import { google } from 'googleapis';
 
 export const dynamic = 'force-dynamic';
+export const revalidate = 0;
 
 const formatPrivateKey = (key: string | undefined): string | undefined => {
   if (!key) return undefined;
@@ -265,7 +266,13 @@ export async function GET(req: Request) {
       weeklySlots.push(dayResult);
     }
 
-    return NextResponse.json(weeklySlots);
+    return NextResponse.json(weeklySlots, {
+      headers: {
+        'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0',
+        'Pragma': 'no-cache',
+        'Expires': '0',
+      }
+    });
   } catch (error: any) {
     console.error('Calendar API Error:', error);
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });

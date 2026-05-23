@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 
 export const dynamic = 'force-dynamic';
+export const revalidate = 0;
 
 export async function GET() {
   try {
@@ -42,7 +43,13 @@ export async function GET() {
       キャンペーン備考: item.campaign_notes || ''
     }));
 
-    return NextResponse.json({ config, stores });
+    return NextResponse.json({ config, stores }, {
+      headers: {
+        'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0',
+        'Pragma': 'no-cache',
+        'Expires': '0',
+      }
+    });
   } catch (error: any) {
     console.error('Config API Error:', error);
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
