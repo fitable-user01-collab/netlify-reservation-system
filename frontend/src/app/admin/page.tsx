@@ -808,7 +808,10 @@ export default function AdminPage() {
                   onClick={() => {
                     if (activeTab === 'schedule') saveScheduleSettings();
                     if (activeTab === 'stores') saveStoreBasicInfos();
-                    if (activeTab === 'system') saveSystemConfig();
+                    if (activeTab === 'system') {
+                      saveSystemConfig();
+                      saveStoreBasicInfos(); // 店舗の追加・削除も同時に保存する
+                    }
                   }}
                 >
                   設定を保存
