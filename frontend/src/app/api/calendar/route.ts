@@ -118,19 +118,25 @@ export async function GET(req: Request) {
     });
 
     // 3.5 店舗個別の特別スケジュール情報をSupabaseから取得 (短縮営業など)
+    // データベースの日付形式（YYYY-MM-DD）に変換して検索クエリを投げます
+    const startHyphen = startDateStr.replace(/\//g, '-');
+    const endHyphen = endDateStr.replace(/\//g, '-');
+
     const { data: specialSchedulesData, error: specialSchedulesError } = await supabase
       .from('special_schedules')
       .select('*')
       .eq('store_name', store)
-      .gte('date', startDateStr)
-      .lte('date', endDateStr);
+      .gte('date', startHyphen)
+      .lte('date', endHyphen);
 
     if (specialSchedulesError) throw specialSchedulesError;
 
     const specialSchedulesMap: Record<string, any> = {};
     (specialSchedulesData || []).forEach(item => {
       if (item.date) {
-        specialSchedulesMap[item.date] = {
+        // カレンダー表示側（YYYY/MM/DD）の形式にキーをマッピング
+        const slashDate = item.date.replace(/-/g, '/');
+        specialSchedulesMap[slashDate] = {
           active: item.active,
           start: item.start_time,
           end: item.end_time,

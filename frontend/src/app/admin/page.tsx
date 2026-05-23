@@ -347,12 +347,15 @@ export default function AdminPage() {
         setStores(JSON.parse(JSON.stringify(editStores)));
         setStoreRenames({});
         setIsDirtyStores(false);
+        return true;
       } else {
         alert(data.error || '保存に失敗しました。');
+        return false;
       }
     } catch (err) {
       console.error('Save stores error:', err);
       alert('保存処理中に通信エラーが発生しました。');
+      return false;
     } finally {
       setLoading(false);
     }
@@ -875,8 +878,14 @@ export default function AdminPage() {
                 <button
                   className="primary-btn"
                   style={{ width: '120px', padding: '8px 0', fontSize: '13px' }}
-                  onClick={() => {
-                    if (activeTab === 'hours' || activeTab === 'holidays') saveScheduleSettings();
+                  onClick={async () => {
+                    if (activeTab === 'hours' || activeTab === 'holidays') {
+                      if (isDirtyStores) {
+                        const success = await saveStoreBasicInfos();
+                        if (!success) return;
+                      }
+                      saveScheduleSettings();
+                    }
                     if (activeTab === 'stores') saveStoreBasicInfos();
                     if (activeTab === 'system') {
                       saveSystemConfig();
