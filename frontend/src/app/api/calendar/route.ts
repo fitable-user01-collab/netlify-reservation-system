@@ -117,6 +117,30 @@ export async function GET(req: Request) {
       }
     });
 
+    // 3.5 店舗個別の特別スケジュール情報をSupabaseから取得 (短縮営業など)
+    const { data: specialSchedulesData, error: specialSchedulesError } = await supabase
+      .from('special_schedules')
+      .select('*')
+      .eq('store_name', store)
+      .gte('date', startDateStr)
+      .lte('date', endDateStr);
+
+    if (specialSchedulesError) throw specialSchedulesError;
+
+    const specialSchedulesMap: Record<string, any> = {};
+    (specialSchedulesData || []).forEach(item => {
+      if (item.date) {
+        specialSchedulesMap[item.date] = {
+          active: item.active,
+          start: item.start_time,
+          end: item.end_time,
+          breakStart: item.break_start,
+          breakEnd: item.break_end,
+          maxSlots: item.max_slots
+        };
+      }
+    });
+
     // 4. 期間内の確定予約件数をSupabaseから取得
     const { data: bookingsData, error: bookingsError } = await supabase
       .from('bookings')
@@ -182,6 +206,12 @@ export async function GET(req: Request) {
           breakEnd: '14:00',
           maxSlots: 1
         };
+      }
+
+      // 特別スケジュールが登録されている日付は、そちらを最優先で上書き（オーバーライド）
+      const specialSettings = specialSchedulesMap[targetDateStr];
+      if (specialSettings) {
+        storeSettings = specialSettings;
       }
 
       if (!storeSettings.active) {

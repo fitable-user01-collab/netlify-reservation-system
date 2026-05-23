@@ -3,7 +3,7 @@ import { supabase } from '@/lib/supabase';
 
 export async function POST(req: Request) {
   try {
-    const { authPin, store, settings, holidays } = await req.json();
+    const { authPin, store, settings, holidays, specialSchedules } = await req.json();
 
     if (!store) {
       return NextResponse.json({ success: false, error: '店舗名が指定されていません。' }, { status: 400 });
@@ -70,6 +70,39 @@ export async function POST(req: Request) {
           .insert(insertHolidays);
         
         if (insertError) throw insertError;
+      }
+    }
+
+    // 4. 特別スケジュールの保存 (special_schedules テーブル)
+    if (Array.isArray(specialSchedules)) {
+      // 既存の当該店舗の特別スケジュールを一旦すべて削除
+      const { error: deleteSpecialError } = await supabase
+        .from('special_schedules')
+        .delete()
+        .eq('store_name', store);
+
+      if (deleteSpecialError) throw deleteSpecialError;
+
+      // 新しい特別スケジュールを登録
+      const insertSpecialRows = specialSchedules
+        .filter((s: any) => s.date)
+        .map((s: any) => ({
+          store_name: store,
+          date: s.date,
+          active: s.active === true || s.active === 'true',
+          start_time: s.start || '09:00',
+          end_time: s.end || '21:00',
+          break_start: s.breakStart || '',
+          break_end: s.breakEnd || '',
+          max_slots: parseInt(s.maxSlots, 10) || 1
+        }));
+
+      if (insertSpecialRows.length > 0) {
+        const { error: insertSpecialError } = await supabase
+          .from('special_schedules')
+          .insert(insertSpecialRows);
+
+        if (insertSpecialError) throw insertSpecialError;
       }
     }
 
@@ -153,7 +186,26 @@ export async function GET(req: Request) {
 
     holidays.sort();
 
-    return NextResponse.json({ settings: finalSettings, holidays });
+    // 4. 特別スケジュールの取得
+    const { data: specialSchedulesData, error: specialSchedulesError } = await supabase
+      .from('special_schedules')
+      .select('*')
+      .eq('store_name', store)
+      .order('date', { ascending: true });
+
+    if (specialSchedulesError) throw specialSchedulesError;
+
+    const specialSchedules = (specialSchedulesData || []).map(item => ({
+      date: item.date,
+      active: item.active,
+      start: item.start_time,
+      end: item.end_time,
+      breakStart: item.break_start,
+      breakEnd: item.break_end,
+      maxSlots: item.max_slots
+    }));
+
+    return NextResponse.json({ settings: finalSettings, holidays, specialSchedules });
   } catch (error: any) {
     console.error('Get Settings API Error:', error);
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });

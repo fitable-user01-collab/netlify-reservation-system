@@ -51,6 +51,28 @@ export default function AdminPage() {
   const [holidays, setHolidays] = useState<string[]>([]);
   const [editHolidays, setEditHolidays] = useState<string[]>([]);
 
+  interface SpecialScheduleSetting {
+    date: string;
+    active: boolean;
+    start: string;
+    end: string;
+    breakStart: string;
+    breakEnd: string;
+    maxSlots: number;
+  }
+
+  const [specialSchedules, setSpecialSchedules] = useState<SpecialScheduleSetting[]>([]);
+  const [editSpecialSchedules, setEditSpecialSchedules] = useState<SpecialScheduleSetting[]>([]);
+
+  // 特別スケジュール入力用のフォーム情報
+  const [specialDate, setSpecialDate] = useState<string>('');
+  const [specialActive, setSpecialActive] = useState<boolean>(true);
+  const [specialStart, setSpecialStart] = useState<string>('09:00');
+  const [specialEnd, setSpecialEnd] = useState<string>('21:00');
+  const [specialBreakStart, setSpecialBreakStart] = useState<string>('13:00');
+  const [specialBreakEnd, setSpecialBreakEnd] = useState<string>('14:00');
+  const [specialMaxSlots, setSpecialMaxSlots] = useState<number>(1);
+
   // 予約管理（カレンダー）関連
   const [reservations, setReservations] = useState<any[]>([]);
   const [yearMonth, setYearMonth] = useState<string>(''); // YYYY-MM形式
@@ -122,6 +144,8 @@ export default function AdminPage() {
         setEditSettings(JSON.parse(JSON.stringify(data.settings)));
         setHolidays(data.holidays);
         setEditHolidays([...data.holidays]);
+        setSpecialSchedules(data.specialSchedules || []);
+        setEditSpecialSchedules(JSON.parse(JSON.stringify(data.specialSchedules || [])));
         setIsDirtySettings(false);
       } else {
         alert(data.error || '店舗設定の取得に失敗しました。');
@@ -177,6 +201,7 @@ export default function AdminPage() {
     if (tabName === 'schedule') {
       setEditSettings(JSON.parse(JSON.stringify(settings)));
       setEditHolidays([...holidays]);
+      setEditSpecialSchedules(JSON.parse(JSON.stringify(specialSchedules)));
       setIsDirtySettings(false);
     } else if (tabName === 'stores') {
       setEditStores(JSON.parse(JSON.stringify(stores)));
@@ -229,6 +254,43 @@ export default function AdminPage() {
     setSelectedStore(newStoreName);
   };
 
+  // 特別スケジュールの追加
+  const addSpecialSchedule = () => {
+    if (!specialDate) {
+      alert('日付を選択してください。');
+      return;
+    }
+
+    // 重複チェック
+    const exists = editSpecialSchedules.some(s => s.date === specialDate);
+    if (exists) {
+      alert('その日付の特別スケジュールは既に登録されています。修正する場合は一度削除してから追加してください。');
+      return;
+    }
+
+    const newSetting: SpecialScheduleSetting = {
+      date: specialDate,
+      active: specialActive,
+      start: specialStart,
+      end: specialEnd,
+      breakStart: specialBreakStart,
+      breakEnd: specialBreakEnd,
+      maxSlots: specialMaxSlots
+    };
+
+    const updated = [...editSpecialSchedules, newSetting].sort((a, b) => a.date.localeCompare(b.date));
+    setEditSpecialSchedules(updated);
+    setIsDirtySettings(true);
+    setSpecialDate(''); // リセット
+  };
+
+  // 特別スケジュールの削除
+  const removeSpecialSchedule = (dateToDelete: string) => {
+    const updated = editSpecialSchedules.filter(s => s.date !== dateToDelete);
+    setEditSpecialSchedules(updated);
+    setIsDirtySettings(true);
+  };
+
   // ==========================================
   // 保存処理 (API送信)
   // ==========================================
@@ -244,14 +306,16 @@ export default function AdminPage() {
           authPin,
           store: selectedStore,
           settings: editSettings,
-          holidays: editHolidays
+          holidays: editHolidays,
+          specialSchedules: editSpecialSchedules
         })
       });
       const data = await res.json();
       if (data.success) {
-        alert('スケジュール・休日設定を保存しました。');
+        alert('スケジュール・休日・特定日設定を保存しました。');
         setSettings(JSON.parse(JSON.stringify(editSettings)));
         setHolidays([...editHolidays]);
+        setSpecialSchedules(JSON.parse(JSON.stringify(editSpecialSchedules)));
         setIsDirtySettings(false);
       } else {
         alert(data.error || '保存に失敗しました。');
@@ -636,15 +700,15 @@ export default function AdminPage() {
       店舗名: name.trim(),
       住所: '',
       電話番号: '',
-      カレンダーID: 'primary',
+      カレンダーID: '',
       WebhookURL: '',
       メール持ち物: '',
       メール来店案内: '',
       利用規約: '',
-      プラン名: '体験トレーニング',
-      通常価格: '5,500円(税込)',
-      キャンペーン価格: '0円',
-      キャンペーン備考: '当日入会で体験料キャッシュバックキャンペーン中！'
+      プラン名: '',
+      通常価格: '',
+      キャンペーン価格: '',
+      キャンペーン備考: ''
     };
 
     setEditStores([...editStores, newStoreObj]);
@@ -948,81 +1012,9 @@ export default function AdminPage() {
       {/* タブB. 枠設定 & 休日管理 */}
       {activeTab === 'schedule' && (
         <div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-            <h3 style={{ fontSize: '16px', fontWeight: 'bold' }}>⏰ スケジュール枠設定</h3>
-          </div>
-
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-            {editSettings.map((set, idx) => (
-              <div className="admin-day-block" key={idx}>
-                <div className="admin-day-header">
-                  <span>{set.day}曜日の設定</span>
-                  <label className="admin-checkbox">
-                    <input
-                      type="checkbox"
-                      checked={set.active}
-                      onChange={(e) => handleSettingActiveChange(idx, e.target.checked)}
-                    />
-                    <span>営業する</span>
-                  </label>
-                </div>
-
-                {set.active && (
-                  <div>
-                    <div className="admin-time-row">
-                      <label>営業時間</label>
-                      <input
-                        type="text"
-                        placeholder="09:00"
-                        value={set.start}
-                        onChange={(e) => handleSettingTimeChange(idx, 'start', e.target.value)}
-                      />
-                      <span>～</span>
-                      <input
-                        type="text"
-                        placeholder="21:00"
-                        value={set.end}
-                        onChange={(e) => handleSettingTimeChange(idx, 'end', e.target.value)}
-                      />
-                    </div>
-
-                    <div className="admin-time-row">
-                      <label>休憩時間</label>
-                      <input
-                        type="text"
-                        placeholder="13:00 (空欄可)"
-                        value={set.breakStart}
-                        onChange={(e) => handleSettingTimeChange(idx, 'breakStart', e.target.value)}
-                      />
-                      <span>～</span>
-                      <input
-                        type="text"
-                        placeholder="14:00 (空欄可)"
-                        value={set.breakEnd}
-                        onChange={(e) => handleSettingTimeChange(idx, 'breakEnd', e.target.value)}
-                      />
-                    </div>
-
-                    <div className="admin-time-row">
-                      <label>枠数</label>
-                      <input
-                        type="number"
-                        min={1}
-                        max={10}
-                        value={set.maxSlots}
-                        onChange={(e) => handleSettingMaxSlotsChange(idx, parseInt(e.target.value, 10) || 1)}
-                      />
-                      <span style={{ fontSize: '12px', color: 'var(--text-sub)' }}>名まで同時に体験予約可</span>
-                    </div>
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
-
-          {/* 休日管理セクション */}
-          <div className="summary-card mt-4" style={{ background: '#fff' }}>
-            <h3 style={{ fontSize: '15px', color: 'var(--primary-color)', borderBottom: '2px solid var(--primary-color)', paddingBottom: '6px', marginBottom: '16px' }}>
+          {/* 休日管理セクション (休館日設定を上に配置) */}
+          <div className="summary-card" style={{ background: '#fff', marginBottom: '24px' }}>
+            <h3 style={{ fontSize: '15px', color: 'var(--primary-color)', borderBottom: '2px solid var(--primary-color)', paddingBottom: '6px', marginBottom: '16px', fontWeight: 'bold' }}>
               🏖️ カスタム休館日設定
             </h3>
 
@@ -1076,6 +1068,230 @@ export default function AdminPage() {
                   )}
                 </div>
               </div>
+            </div>
+          </div>
+
+          {/* 特定日の特別営業時間設定 (中段に配置) */}
+          <div className="summary-card" style={{ background: '#fff', marginBottom: '24px' }}>
+            <h3 style={{ fontSize: '15px', color: 'var(--primary-color)', borderBottom: '2px solid var(--primary-color)', paddingBottom: '6px', marginBottom: '16px', fontWeight: 'bold' }}>
+              ⭐ 特定日の特別営業時間設定（短縮営業など）
+            </h3>
+            <p style={{ fontSize: '12px', color: 'var(--text-sub)', marginBottom: '16px' }}>
+              特定の日付に対して、デフォルトの曜日別設定とは異なる特別な営業時間を設定できます。（例：短縮営業、特別枠数など）
+            </p>
+
+            <div style={{ display: 'flex', gap: '20px', alignItems: 'flex-start', flexWrap: 'wrap', marginBottom: '20px', padding: '16px', background: '#fcfbfa', borderRadius: '8px', border: '1px dashed var(--border-color)' }}>
+              <div style={{ flex: '1', minWidth: '250px' }}>
+                <div style={{ marginBottom: '12px' }}>
+                  <label style={{ fontSize: '13px', fontWeight: 'bold', display: 'block', marginBottom: '6px' }}>対象日</label>
+                  <input
+                    type="date"
+                    className="form-control"
+                    style={{ width: '100%', padding: '8px' }}
+                    value={specialDate}
+                    onChange={(e) => setSpecialDate(e.target.value)}
+                  />
+                </div>
+
+                <div style={{ marginBottom: '12px' }}>
+                  <label style={{ fontSize: '13px', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+                    <input
+                      type="checkbox"
+                      checked={specialActive}
+                      onChange={(e) => setSpecialActive(e.target.checked)}
+                    />
+                    <span>この日は営業する</span>
+                  </label>
+                </div>
+
+                {specialActive && (
+                  <div style={{ marginBottom: '12px' }}>
+                    <label style={{ fontSize: '13px', fontWeight: 'bold', display: 'block', marginBottom: '6px' }}>枠数 (最大同時予約人数)</label>
+                    <input
+                      type="number"
+                      className="form-control"
+                      min={1}
+                      max={10}
+                      style={{ width: '100%', padding: '8px' }}
+                      value={specialMaxSlots}
+                      onChange={(e) => setSpecialMaxSlots(parseInt(e.target.value, 10) || 1)}
+                    />
+                  </div>
+                )}
+              </div>
+
+              {specialActive && (
+                <div style={{ flex: '1', minWidth: '250px' }}>
+                  <div style={{ marginBottom: '12px' }}>
+                    <label style={{ fontSize: '13px', fontWeight: 'bold', display: 'block', marginBottom: '6px' }}>営業時間</label>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <input
+                        type="time"
+                        className="form-control"
+                        style={{ padding: '8px', flex: 1 }}
+                        value={specialStart}
+                        onChange={(e) => setSpecialStart(e.target.value)}
+                      />
+                      <span>～</span>
+                      <input
+                        type="time"
+                        className="form-control"
+                        style={{ padding: '8px', flex: 1 }}
+                        value={specialEnd}
+                        onChange={(e) => setSpecialEnd(e.target.value)}
+                      />
+                    </div>
+                  </div>
+
+                  <div style={{ marginBottom: '12px' }}>
+                    <label style={{ fontSize: '13px', fontWeight: 'bold', display: 'block', marginBottom: '6px' }}>休憩時間</label>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <input
+                        type="time"
+                        className="form-control"
+                        style={{ padding: '8px', flex: 1 }}
+                        value={specialBreakStart}
+                        onChange={(e) => setSpecialBreakStart(e.target.value)}
+                      />
+                      <span>～</span>
+                      <input
+                        type="time"
+                        className="form-control"
+                        style={{ padding: '8px', flex: 1 }}
+                        value={specialBreakEnd}
+                        onChange={(e) => setSpecialBreakEnd(e.target.value)}
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              <div style={{ width: '100%', display: 'flex', justifyContent: 'flex-end', marginTop: '8px' }}>
+                <button
+                  type="button"
+                  className="primary-btn"
+                  style={{ padding: '8px 24px', fontSize: '14px', width: 'auto' }}
+                  onClick={addSpecialSchedule}
+                >
+                  特別スケジュールを追加
+                </button>
+              </div>
+            </div>
+
+            {/* 登録済み特別スケジュール一覧 */}
+            <div>
+              <label style={{ display: 'block', fontWeight: 'bold', fontSize: '13px', marginBottom: '8px' }}>登録済みの特別スケジュール</label>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '300px', overflowY: 'auto', padding: '4px' }}>
+                {editSpecialSchedules.map((spec, idx) => (
+                  <div
+                    key={idx}
+                    style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      padding: '10px 16px',
+                      background: spec.active ? '#f0f9ff' : '#f3f4f6',
+                      border: spec.active ? '1px solid #bae6fd' : '1px solid #e5e7eb',
+                      borderRadius: '8px',
+                      fontSize: '13px'
+                    }}
+                  >
+                    <div>
+                      <strong style={{ fontSize: '14px', marginRight: '12px', color: spec.active ? '#0369a1' : '#4b5563' }}>
+                        📅 {spec.date}
+                      </strong>
+                      {spec.active ? (
+                        <span>
+                          営業中 ({spec.start}～{spec.end} / 休憩: {spec.breakStart}～{spec.breakEnd} / 枠数: {spec.maxSlots}名)
+                        </span>
+                      ) : (
+                        <span style={{ color: '#ff3b30', fontWeight: 'bold' }}>終日休業 (特別営業外)</span>
+                      )}
+                    </div>
+                    <button
+                      type="button"
+                      className="primary-btn outline"
+                      style={{ padding: '4px 10px', fontSize: '12px', borderColor: '#ff3b30', color: '#ff3b30', borderRadius: '4px', width: 'auto' }}
+                      onClick={() => removeSpecialSchedule(spec.date)}
+                    >
+                      削除
+                    </button>
+                  </div>
+                ))}
+                {editSpecialSchedules.length === 0 && (
+                  <p style={{ color: 'var(--text-sub)', fontSize: '13px', padding: '10px 0' }}>登録されている特別スケジュールはありません。</p>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* デフォルトの営業時間設定 (曜日別) */}
+          <div className="summary-card" style={{ background: '#fff', marginBottom: '24px' }}>
+            <h3 style={{ fontSize: '15px', color: 'var(--primary-color)', borderBottom: '2px solid var(--primary-color)', paddingBottom: '6px', marginBottom: '16px', fontWeight: 'bold' }}>
+              ⏰ デフォルトの営業時間設定（曜日別）
+            </h3>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              {editSettings.map((set, idx) => (
+                <div className="admin-day-block" key={idx}>
+                  <div className="admin-day-header">
+                    <span>{set.day === '祝' ? '祝日' : `${set.day}曜日`}の設定</span>
+                    <label className="admin-checkbox">
+                      <input
+                        type="checkbox"
+                        checked={set.active}
+                        onChange={(e) => handleSettingActiveChange(idx, e.target.checked)}
+                      />
+                      <span>営業する</span>
+                    </label>
+                  </div>
+
+                  {set.active && (
+                    <div>
+                      <div className="admin-time-row">
+                        <label>営業時間</label>
+                        <input
+                          type="time"
+                          value={set.start}
+                          onChange={(e) => handleSettingTimeChange(idx, 'start', e.target.value)}
+                        />
+                        <span>～</span>
+                        <input
+                          type="time"
+                          value={set.end}
+                          onChange={(e) => handleSettingTimeChange(idx, 'end', e.target.value)}
+                        />
+                      </div>
+
+                      <div className="admin-time-row">
+                        <label>休憩時間</label>
+                        <input
+                          type="time"
+                          value={set.breakStart}
+                          onChange={(e) => handleSettingTimeChange(idx, 'breakStart', e.target.value)}
+                        />
+                        <span>～</span>
+                        <input
+                          type="time"
+                          value={set.breakEnd}
+                          onChange={(e) => handleSettingTimeChange(idx, 'breakEnd', e.target.value)}
+                        />
+                      </div>
+
+                      <div className="admin-time-row">
+                        <label>枠数</label>
+                        <input
+                          type="number"
+                          min={1}
+                          max={10}
+                          value={set.maxSlots}
+                          onChange={(e) => handleSettingMaxSlotsChange(idx, parseInt(e.target.value, 10) || 1)}
+                        />
+                        <span style={{ fontSize: '12px', color: 'var(--text-sub)' }}>名まで同時に体験予約可</span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ))}
             </div>
           </div>
         </div>
