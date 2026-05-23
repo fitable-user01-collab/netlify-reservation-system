@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { db } from '@/lib/firebase';
+import { supabase } from '@/lib/supabase';
 
 export async function POST(req: Request) {
   try {
@@ -9,9 +9,18 @@ export async function POST(req: Request) {
       return NextResponse.json({ success: false, error: 'PINコードを入力してください。' }, { status: 400 });
     }
 
-    const globalDoc = await db.collection('system_config').doc('global').get();
-    const globalConfig = globalDoc.exists ? globalDoc.data() : null;
-    const adminPin = globalConfig?.ADMIN_PIN || '1234';
+    // system_config からグローバル設定を取得
+    const { data: configData, error: configError } = await supabase
+      .from('system_config')
+      .select('config')
+      .eq('key', 'global')
+      .single();
+
+    if (configError && configError.code !== 'PGRST116') {
+      throw configError;
+    }
+
+    const adminPin = configData?.config?.ADMIN_PIN || '1234';
 
     if (String(pin) === String(adminPin)) {
       return NextResponse.json({ success: true });

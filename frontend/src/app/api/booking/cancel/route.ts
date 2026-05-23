@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { db } from '@/lib/firebase';
+import { supabase } from '@/lib/supabase';
 import { google } from 'googleapis';
 
 export const dynamic = 'force-dynamic';
@@ -49,20 +49,26 @@ export async function POST(req: Request) {
       return NextResponse.json({ success: false, error: '予約番号を指定してください。' }, { status: 400 });
     }
 
-    const bookingRef = db.collection('bookings').doc(bookingId);
-    const bookingDoc = await bookingRef.get();
+    // 1. Supabaseから予約情報の取得
+    const { data: booking, error: bookingError } = await supabase
+      .from('bookings')
+      .select('*')
+      .eq('id', bookingId)
+      .single();
 
-    if (!bookingDoc.exists) {
+    if (bookingError || !booking) {
       return NextResponse.json({ success: false, error: '該当する予約情報が見つかりません。' }, { status: 404 });
     }
-
-    const booking = bookingDoc.data();
 
     // 管理者PINが渡され、一致した場合はメール検証をスキップする
     let isBypassed = false;
     if (authPin) {
-      const globalDoc = await db.collection('system_config').doc('global').get();
-      const adminPin = globalDoc.exists ? globalDoc.data()?.ADMIN_PIN : '1234';
+      const { data: configData } = await supabase
+        .from('system_config')
+        .select('config')
+        .eq('key', 'global')
+        .single();
+      const adminPin = configData?.config?.ADMIN_PIN || '1234';
       if (String(authPin) === String(adminPin)) {
         isBypassed = true;
       }
@@ -72,32 +78,43 @@ export async function POST(req: Request) {
       if (!email) {
         return NextResponse.json({ success: false, error: 'メールアドレスを入力してください。' }, { status: 400 });
       }
-      if (booking?.email?.toLowerCase().trim() !== email.toLowerCase().trim()) {
+      if (booking.email?.toLowerCase().trim() !== email.toLowerCase().trim()) {
         return NextResponse.json({ success: false, error: '予約番号またはメールアドレスが一致しません。' }, { status: 403 });
       }
     }
 
-    if (booking?.status === 'キャンセル') {
+    if (booking.status === 'キャンセル') {
       return NextResponse.json({ success: false, error: 'この予約はすでにキャンセルされています。' }, { status: 400 });
     }
 
-    // 1. Firestore上のステータスをキャンセルに更新
-    await bookingRef.update({ status: 'キャンセル' });
+    // 2. Supabase上のステータスをキャンセルに更新
+    const { error: updateError } = await supabase
+      .from('bookings')
+      .update({ status: 'キャンセル' })
+      .eq('id', bookingId);
 
-    // 2. Googleカレンダーイベントの削除
-    if (booking?.eventId && booking?.store) {
-      const storeDoc = await db.collection('stores').doc(booking.store).get();
-      const storeInfo = storeDoc.exists ? storeDoc.data() : null;
+    if (updateError) throw updateError;
 
-      const globalDoc = await db.collection('system_config').doc('global').get();
-      const globalConfig = globalDoc.exists ? globalDoc.data() : null;
+    // 3. Googleカレンダーイベントの削除
+    if (booking.event_id && booking.store_name) {
+      const { data: storeInfo } = await supabase
+        .from('stores')
+        .select('calendar_id')
+        .eq('name', booking.store_name)
+        .single();
 
-      const calendarId = storeInfo?.カレンダーID || globalConfig?.DEFAULT_CALENDAR_ID || 'primary';
+      const { data: configData } = await supabase
+        .from('system_config')
+        .select('config')
+        .eq('key', 'global')
+        .single();
 
-      await deleteCalendarEvent(booking.eventId, calendarId);
+      const calendarId = storeInfo?.calendar_id || configData?.config?.DEFAULT_CALENDAR_ID || 'primary';
+
+      await deleteCalendarEvent(booking.event_id, calendarId);
     }
 
-    return NextResponse.json({ success: true, name: booking?.name });
+    return NextResponse.json({ success: true, name: booking.name });
   } catch (error: any) {
     console.error('Cancel Booking API Error:', error);
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });

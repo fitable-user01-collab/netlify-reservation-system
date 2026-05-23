@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { db } from '@/lib/firebase';
+import { supabase } from '@/lib/supabase';
 
 export const dynamic = 'force-dynamic';
 
@@ -14,8 +14,13 @@ export async function GET(req: Request) {
     }
 
     // 1. セキュリティ認証
-    const globalDoc = await db.collection('system_config').doc('global').get();
-    const adminPin = globalDoc.exists ? globalDoc.data()?.ADMIN_PIN : '1234';
+    const { data: configData } = await supabase
+      .from('system_config')
+      .select('config')
+      .eq('key', 'global')
+      .single();
+    
+    const adminPin = configData?.config?.ADMIN_PIN || '1234';
 
     if (String(authPin) !== String(adminPin)) {
       return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
@@ -27,35 +32,33 @@ export async function GET(req: Request) {
     const lastDay = new Date(year, month, 0).getDate();
     const endDateStr = `${year}/${String(month).padStart(2, '0')}/${String(lastDay).padStart(2, '0')}`;
 
-    // 3. Firestoreより全店舗の全予約データを取得
-    const bookingsSnapshot = await db.collection('bookings').get();
+    // 3. Supabaseより全店舗の対象月の予約データを日付・時間・店舗名順で取得
+    const { data: bookingsData, error: bookingsError } = await supabase
+      .from('bookings')
+      .select('*')
+      .gte('date', startDateStr)
+      .lte('date', endDateStr)
+      .order('date', { ascending: true })
+      .order('time', { ascending: true })
+      .order('store_name', { ascending: true });
 
-    const reservations: any[] = [];
-    bookingsSnapshot.forEach(doc => {
-      const data = doc.data();
-      if (data.date && data.date >= startDateStr && data.date <= endDateStr) {
-        reservations.push({
-          bookingId: doc.id,
-          timestamp: data.timestamp || '',
-          status: data.status || '予約確定',
-          name: data.name || '',
-          kana: data.kana || '',
-          phone: data.phone || '',
-          email: data.email || '',
-          date: data.date || '',
-          time: data.time || '',
-          store: data.store || '',
-          notes: data.notes || ''
-        });
-      }
-    });
+    if (bookingsError) {
+      throw bookingsError;
+    }
 
-    // 日付順・時間順にソート
-    reservations.sort((a, b) => {
-      if (a.date !== b.date) return a.date.localeCompare(b.date);
-      if (a.time !== b.time) return a.time.localeCompare(b.time);
-      return (a.store || '').localeCompare(b.store || '');
-    });
+    const reservations = (bookingsData || []).map(b => ({
+      bookingId: b.id,
+      timestamp: b.timestamp || '',
+      status: b.status || '予約確定',
+      name: b.name || '',
+      kana: b.kana || '',
+      phone: b.phone || '',
+      email: b.email || '',
+      date: b.date || '',
+      time: b.time || '',
+      store: b.store_name || '',
+      notes: b.notes || ''
+    }));
 
     return NextResponse.json({ success: true, reservations });
   } catch (error: any) {

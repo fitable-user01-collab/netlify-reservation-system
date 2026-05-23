@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { db } from '@/lib/firebase';
+import { supabase } from '@/lib/supabase';
 import { google } from 'googleapis';
 
 export const dynamic = 'force-dynamic';
@@ -30,7 +30,6 @@ async function getJapaneseHolidays(startDateStr: string, endDateStr: string): Pr
 
     const calendar = google.calendar({ version: 'v3', auth });
     
-    // 開始日時と終了日時を設定 (JST基準)
     const timeMin = new Date(startDateStr.replace(/\//g, '-') + 'T00:00:00+09:00').toISOString();
     const timeMax = new Date(endDateStr.replace(/\//g, '-') + 'T23:59:59+09:00').toISOString();
 
@@ -44,7 +43,6 @@ async function getJapaneseHolidays(startDateStr: string, endDateStr: string): Pr
     const events = response.data.items || [];
     events.forEach(event => {
       if (event.start && event.start.date) {
-        // YYYY-MM-DDをYYYY/MM/DDに整形して登録
         const formattedDate = event.start.date.replace(/-/g, '/');
         holidays.add(formattedDate);
       }
@@ -82,38 +80,58 @@ export async function GET(req: Request) {
     // 1. Googleカレンダーから祝日情報を取得
     const nationalHolidays = await getJapaneseHolidays(startDateStr, endDateStr);
 
-    // 2. 店舗別・曜日別のスケジュール設定をFirestoreから取得
-    const settingsSnapshot = await db.collection('stores').doc(store).collection('settings').get();
+    // 2. 店舗別・曜日別のスケジュール設定をSupabaseから取得
+    const { data: settingsData, error: settingsError } = await supabase
+      .from('store_settings')
+      .select('*')
+      .eq('store_name', store);
+
+    if (settingsError) throw settingsError;
+
     const storeSettingsMap: Record<string, any> = {};
-    settingsSnapshot.forEach(doc => {
-      storeSettingsMap[doc.id] = doc.data();
+    (settingsData || []).forEach(item => {
+      storeSettingsMap[item.day_name] = {
+        active: item.active,
+        start: item.start_time,
+        end: item.end_time,
+        breakStart: item.break_start,
+        breakEnd: item.break_end,
+        maxSlots: item.max_slots
+      };
     });
 
-    // 3. 店舗個別の休館日情報をFirestoreから取得 (インデックスエラー防止のためメモリ内で日付フィルタ)
-    const holidaysSnapshot = await db
-      .collection('holidays')
-      .where('store', '==', store)
-      .get();
+    // 3. 店舗個別の休館日情報をSupabaseから取得
+    const { data: holidaysData, error: holidaysError } = await supabase
+      .from('holidays')
+      .select('date')
+      .eq('store_name', store)
+      .gte('date', startDateStr)
+      .lte('date', endDateStr);
+
+    if (holidaysError) throw holidaysError;
     
     const storeHolidaysSet = new Set<string>();
-    holidaysSnapshot.forEach(doc => {
-      const data = doc.data();
-      if (data.date && data.date >= startDateStr && data.date <= endDateStr) {
-        storeHolidaysSet.add(data.date);
+    (holidaysData || []).forEach(item => {
+      if (item.date) {
+        storeHolidaysSet.add(item.date);
       }
     });
 
-    // 4. 予約件数の確認 (インデックスエラー防止のためメモリ内で日付・ステータスフィルタ)
-    const bookingsSnapshot = await db
-      .collection('bookings')
-      .where('store', '==', store)
-      .get();
+    // 4. 期間内の確定予約件数をSupabaseから取得
+    const { data: bookingsData, error: bookingsError } = await supabase
+      .from('bookings')
+      .select('date, time')
+      .eq('store_name', store)
+      .eq('status', '予約確定')
+      .gte('date', startDateStr)
+      .lte('date', endDateStr);
+
+    if (bookingsError) throw bookingsError;
 
     // 予約状況マップを作成: { "2026/05/19": { "09:00～10:00": 1, ... } }
     const bookingCountsMap: Record<string, Record<string, number>> = {};
-    bookingsSnapshot.forEach(doc => {
-      const b = doc.data();
-      if (b.status === '予約確定' && b.date && b.time && b.date >= startDateStr && b.date <= endDateStr) {
+    (bookingsData || []).forEach(b => {
+      if (b.date && b.time) {
         if (!bookingCountsMap[b.date]) {
           bookingCountsMap[b.date] = {};
         }
@@ -126,7 +144,6 @@ export async function GET(req: Request) {
     const weeklySlots: any[] = [];
 
     const now = new Date();
-    // 日本時間に合わせた今日の日付と時間
     const toJstTime = (date: Date) => {
       return new Date(date.toLocaleString('en-US', { timeZone: 'Asia/Tokyo' }));
     };
@@ -139,7 +156,6 @@ export async function GET(req: Request) {
       const targetDateStr = formatDate(targetDate);
       let dayName = dayNames[targetDate.getDay()];
 
-      // 祝日判定
       if (nationalHolidays.has(targetDateStr)) {
         dayName = '祝';
       }
@@ -150,13 +166,11 @@ export async function GET(req: Request) {
         slots: [] as any[]
       };
 
-      // 店舗休館日リストに入っている場合は空枠をスキップ
       if (storeHolidaysSet.has(targetDateStr)) {
         weeklySlots.push(dayResult);
         continue;
       }
 
-      // 曜日設定の読み込み
       let storeSettings = storeSettingsMap[dayName];
       if (!storeSettings) {
         // デフォルト設定
@@ -175,7 +189,6 @@ export async function GET(req: Request) {
         continue;
       }
 
-      // 時間スロットの作成 (1時間刻み)
       let currentHour = parseInt(storeSettings.start.split(':')[0], 10);
       const endHour = parseInt(storeSettings.end.split(':')[0], 10);
 
@@ -191,7 +204,6 @@ export async function GET(req: Request) {
       const dailyBookings = bookingCountsMap[targetDateStr] || {};
 
       while (currentHour < endHour) {
-        // 休憩時間判定
         if (currentHour >= bStartHour && currentHour < bEndHour) {
           currentHour++;
           continue;
@@ -200,7 +212,6 @@ export async function GET(req: Request) {
         const slotTimeStr = `${String(currentHour).padStart(2, '0')}:00～${String(currentHour + 1).padStart(2, '0')}:00`;
         const booked = dailyBookings[slotTimeStr] || 0;
         
-        // 過去の日時または今日の過去時間は予約不可にする
         const isPast = (targetDateStr < todayStr) || (targetDateStr === todayStr && currentHour <= nowHour);
         const maxSlots = storeSettings.maxSlots;
 

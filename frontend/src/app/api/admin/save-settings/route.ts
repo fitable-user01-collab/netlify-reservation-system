@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { db } from '@/lib/firebase';
+import { supabase } from '@/lib/supabase';
 
 export async function POST(req: Request) {
   try {
@@ -10,55 +10,68 @@ export async function POST(req: Request) {
     }
 
     // 1. セキュリティ認証
-    const globalDoc = await db.collection('system_config').doc('global').get();
-    const adminPin = globalDoc.exists ? globalDoc.data()?.ADMIN_PIN : '1234';
+    const { data: configData } = await supabase
+      .from('system_config')
+      .select('config')
+      .eq('key', 'global')
+      .single();
+    
+    const adminPin = configData?.config?.ADMIN_PIN || '1234';
 
     if (String(authPin) !== String(adminPin)) {
       return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
     }
 
-    const batch = db.batch();
-
-    // 2. 曜日設定の保存 (stores/{store}/settings/{day})
+    // 2. 曜日設定の保存 (store_settings テーブルへの upsert)
     if (Array.isArray(settings)) {
-      settings.forEach((set: any) => {
-        if (!set.day) return;
-        const ref = db.collection('stores').doc(store).collection('settings').doc(set.day);
-        batch.set(ref, {
+      const upsertRows = settings
+        .filter((set: any) => set.day)
+        .map((set: any) => ({
+          store_name: store,
+          day_name: set.day,
           active: set.active === true || set.active === 'true',
-          start: set.start || '09:00',
-          end: set.end || '21:00',
-          breakStart: set.breakStart || '',
-          breakEnd: set.breakEnd || '',
-          maxSlots: parseInt(set.maxSlots, 10) || 1
-        }, { merge: true });
-      });
+          start_time: set.start || '09:00',
+          end_time: set.end || '21:00',
+          break_start: set.breakStart || '',
+          break_end: set.breakEnd || '',
+          max_slots: parseInt(set.maxSlots, 10) || 1
+        }));
+
+      if (upsertRows.length > 0) {
+        const { error: upsertError } = await supabase
+          .from('store_settings')
+          .upsert(upsertRows, { onConflict: 'store_name,day_name' });
+        
+        if (upsertError) throw upsertError;
+      }
     }
 
-    // 3. 休日設定の保存 (holidays コレクション)
+    // 3. 休日設定の保存 (holidays テーブル)
     if (Array.isArray(holidays)) {
-      // 既存の当該店舗の休日を一度全削除
-      const holidaySnapshot = await db
-        .collection('holidays')
-        .where('store', '==', store)
-        .get();
-      
-      holidaySnapshot.docs.forEach(doc => {
-        batch.delete(doc.ref);
-      });
+      // 既存の当該店舗の休日を削除
+      const { error: deleteError } = await supabase
+        .from('holidays')
+        .delete()
+        .eq('store_name', store);
+
+      if (deleteError) throw deleteError;
 
       // 新しい休日を登録
-      holidays.forEach((dateStr: string) => {
-        if (!dateStr) return;
-        const ref = db.collection('holidays').doc();
-        batch.set(ref, {
-          store,
+      const insertHolidays = holidays
+        .filter((dateStr: string) => dateStr)
+        .map((dateStr: string) => ({
+          store_name: store,
           date: dateStr // YYYY/MM/DD形式
-        });
-      });
-    }
+        }));
 
-    await batch.commit();
+      if (insertHolidays.length > 0) {
+        const { error: insertError } = await supabase
+          .from('holidays')
+          .insert(insertHolidays);
+        
+        if (insertError) throw insertError;
+      }
+    }
 
     return NextResponse.json({ success: true });
   } catch (error: any) {
@@ -78,24 +91,37 @@ export async function GET(req: Request) {
     }
 
     // 1. セキュリティ認証
-    const globalDoc = await db.collection('system_config').doc('global').get();
-    const adminPin = globalDoc.exists ? globalDoc.data()?.ADMIN_PIN : '1234';
+    const { data: configData } = await supabase
+      .from('system_config')
+      .select('config')
+      .eq('key', 'global')
+      .single();
+    
+    const adminPin = configData?.config?.ADMIN_PIN || '1234';
 
     if (String(authPin) !== String(adminPin)) {
       return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
     }
 
-    // 2. 曜日設定の取得
-    const settingsSnapshot = await db.collection('stores').doc(store).collection('settings').get();
-    const settings: any[] = [];
-    settingsSnapshot.forEach(doc => {
-      settings.push({
-        day: doc.id,
-        ...doc.data()
-      });
-    });
+    // 2. 曜日設定の取得 (store_settings テーブル)
+    const { data: settingsData, error: settingsError } = await supabase
+      .from('store_settings')
+      .select('*')
+      .eq('store_name', store);
 
-    // デフォルト曜日定義
+    if (settingsError) throw settingsError;
+
+    const settings = (settingsData || []).map(item => ({
+      day: item.day_name,
+      active: item.active,
+      start: item.start_time,
+      end: item.end_time,
+      breakStart: item.break_start,
+      breakEnd: item.break_end,
+      maxSlots: item.max_slots
+    }));
+
+    // デフォルト曜日定義とマージ
     const defaultDays = ['月', '火', '水', '木', '金', '土', '日', '祝'];
     const finalSettings = defaultDays.map(day => {
       const found = settings.find(s => s.day === day);
@@ -114,18 +140,16 @@ export async function GET(req: Request) {
     });
 
     // 3. 休日設定の取得
-    const holidaysSnapshot = await db
-      .collection('holidays')
-      .where('store', '==', store)
-      .get();
+    const { data: holidaysData, error: holidaysError } = await supabase
+      .from('holidays')
+      .select('date')
+      .eq('store_name', store);
+
+    if (holidaysError) throw holidaysError;
     
-    const holidays: string[] = [];
-    holidaysSnapshot.forEach(doc => {
-      const data = doc.data();
-      if (data.date) {
-        holidays.push(data.date);
-      }
-    });
+    const holidays = (holidaysData || [])
+      .map(item => item.date)
+      .filter(Boolean);
 
     holidays.sort();
 
@@ -135,4 +159,3 @@ export async function GET(req: Request) {
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
   }
 }
-

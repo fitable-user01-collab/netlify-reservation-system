@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { db } from '@/lib/firebase';
+import { supabase } from '@/lib/supabase';
 
 export async function POST(req: Request) {
   try {
@@ -10,78 +10,80 @@ export async function POST(req: Request) {
     }
 
     // 1. セキュリティ認証
-    const globalDoc = await db.collection('system_config').doc('global').get();
-    const adminPin = globalDoc.exists ? globalDoc.data()?.ADMIN_PIN : '1234';
+    const { data: configData } = await supabase
+      .from('system_config')
+      .select('config')
+      .eq('key', 'global')
+      .single();
+    
+    const adminPin = configData?.config?.ADMIN_PIN || '1234';
 
     if (String(authPin) !== String(adminPin)) {
       return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
     }
 
-    const batch = db.batch();
-
     // 2. 店舗名の変更に伴うマイグレーション処理
+    // PostgreSQL の ON UPDATE CASCADE 制約により、親である stores の主キー(name)を更新するだけで、
+    // 子テーブル（store_settings, holidays, bookings）の店舗名が一括かつ自動的に連動更新されます！
     if (renames && typeof renames === 'object') {
       for (const [oldName, newName] of Object.entries(renames)) {
         if (!oldName || !newName || oldName === newName) continue;
-
-        // A. 週間スケジュール設定の移行 (stores/{oldStoreName}/settings -> stores/{newStoreName}/settings)
-        const oldSettingsSnapshot = await db.collection('stores').doc(oldName).collection('settings').get();
-        for (const doc of oldSettingsSnapshot.docs) {
-          const data = doc.data();
-          const newSettingRef = db.collection('stores').doc(newName as string).collection('settings').doc(doc.id);
-          batch.set(newSettingRef, data);
-          // 旧設定を削除
-          const oldSettingRef = db.collection('stores').doc(oldName).collection('settings').doc(doc.id);
-          batch.delete(oldSettingRef);
-        }
-
-        // B. 休館日設定の移行 (holidays コレクション内の store フィールドの更新)
-        const holidaysSnapshot = await db.collection('holidays').where('store', '==', oldName).get();
-        for (const doc of holidaysSnapshot.docs) {
-          batch.update(doc.ref, { store: newName });
-        }
-
-        // C. 既存予約データの移行 (bookings コレクション内の store フィールドの更新)
-        const bookingsSnapshot = await db.collection('bookings').where('store', '==', oldName).get();
-        for (const doc of bookingsSnapshot.docs) {
-          batch.update(doc.ref, { store: newName });
-        }
+        
+        const { error: renameError } = await supabase
+          .from('stores')
+          .update({ name: newName })
+          .eq('name', oldName);
+        
+        if (renameError) throw renameError;
       }
     }
 
-    // 3. 既存の全店舗リストを取得（削除対象を検出するため）
-    const existingStoresSnapshot = await db.collection('stores').get();
-    const existingStoreNames = existingStoresSnapshot.docs.map(doc => doc.id);
+    // 3. 削除対象の店舗を処理する
+    const { data: existingStores, error: getStoresError } = await supabase
+      .from('stores')
+      .select('name');
+    
+    if (getStoresError) throw getStoresError;
+
+    const existingStoreNames = (existingStores || []).map(s => s.name);
     const newStoreNames = new Set(stores.map((s: any) => s.店舗名).filter(Boolean));
 
     // 送信データにない既存店舗を削除する
-    existingStoreNames.forEach(storeName => {
-      if (!newStoreNames.has(storeName)) {
-        const ref = db.collection('stores').doc(storeName);
-        batch.delete(ref);
-      }
-    });
+    const storesToDelete = existingStoreNames.filter(name => !newStoreNames.has(name));
+    if (storesToDelete.length > 0) {
+      const { error: deleteError } = await supabase
+        .from('stores')
+        .delete()
+        .in('name', storesToDelete);
+      
+      if (deleteError) throw deleteError;
+    }
 
-    // 3. 各店舗情報を登録・更新する
-    stores.forEach((s: any) => {
-      if (!s.店舗名) return;
-      const ref = db.collection('stores').doc(s.店舗名);
-      batch.set(ref, {
-        住所: s.住所 || '',
-        電話番号: s.電話番号 || '',
-        カレンダーID: s.カレンダーID || '',
-        WebhookURL: s.WebhookURL || '',
-        メール持ち物: s.メール持ち物 || '',
-        メール来店案内: s.メール来店案内 || '',
-        利用規約: s.利用規約 || '',
-        プラン名: s.プラン名 || '',
-        通常価格: s.通常価格 || '',
-        キャンペーン価格: s.キャンペーン価格 || '',
-        キャンペーン備考: s.キャンペーン備考 || ''
-      }, { merge: true });
-    });
+    // 4. 各店舗情報を登録・更新する (upsert)
+    const upsertRows = stores
+      .filter((s: any) => s.店舗名)
+      .map((s: any) => ({
+        name: s.店舗名,
+        address: s.住所 || '',
+        phone: s.電話番号 || '',
+        calendar_id: s.カレンダーID || '',
+        webhook_url: s.WebhookURL || '',
+        email_items: s.メール持ち物 || '',
+        email_visit: s.メール来店案内 || '',
+        terms_of_service: s.利用規約 || '',
+        plan_name: s.プラン名 || '',
+        normal_price: s.通常価格 || '',
+        campaign_price: s.キャンペーン価格 || '',
+        campaign_notes: s.キャンペーン備考 || ''
+      }));
 
-    await batch.commit();
+    if (upsertRows.length > 0) {
+      const { error: upsertError } = await supabase
+        .from('stores')
+        .upsert(upsertRows, { onConflict: 'name' });
+
+      if (upsertError) throw upsertError;
+    }
 
     return NextResponse.json({ success: true });
   } catch (error: any) {

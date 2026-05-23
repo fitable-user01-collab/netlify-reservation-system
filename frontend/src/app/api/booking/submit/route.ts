@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { db } from '@/lib/firebase';
+import { supabase } from '@/lib/supabase';
 import { google } from 'googleapis';
 import nodemailer from 'nodemailer';
 
@@ -69,7 +69,7 @@ async function createCalendarEvent(data: any, calendarId: string): Promise<strin
 // Gmail経由で確認メールを送信する
 async function sendConfirmationEmail(data: any, bookingId: string, storeInfo: any, config: any): Promise<boolean> {
   const gmailUser = process.env.GMAIL_USER;
-  const gmailPass = process.env.GMAIL_PASS; // Googleアカウントで生成したアプリパスワード
+  const gmailPass = process.env.GMAIL_PASS;
 
   if (!gmailUser || !gmailPass) {
     console.warn('Gmail credentials not configured in environment variables');
@@ -93,12 +93,12 @@ async function sendConfirmationEmail(data: any, bookingId: string, storeInfo: an
     const subject = '【ジム体験予約】ご予約を受け付けました';
     const cancelUrl = `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/cancel`;
 
-    const address = storeInfo?.住所 || '（住所未登録）';
-    const phone = storeInfo?.電話番号 || '（電話番号未登録）';
-    const mailItems = storeInfo?.メール持ち物 || config?.DEFAULT_EMAIL_ITEMS || '';
-    const mailVisit = storeInfo?.メール来店案内 || config?.DEFAULT_EMAIL_VISIT || '';
-    const planName = storeInfo?.プラン名 || config?.DEFAULT_PLAN_NAME || '体験トレーニング';
-    const normalPrice = storeInfo?.通常価格 || config?.DEFAULT_NORMAL_PRICE || '';
+    const address = storeInfo?.address || '（住所未登録）';
+    const phone = storeInfo?.phone || '（電話番号未登録）';
+    const mailItems = storeInfo?.email_items || config?.DEFAULT_EMAIL_ITEMS || '';
+    const mailVisit = storeInfo?.email_visit || config?.DEFAULT_EMAIL_VISIT || '';
+    const planName = storeInfo?.plan_name || config?.DEFAULT_PLAN_NAME || '体験トレーニング';
+    const normalPrice = storeInfo?.normal_price || config?.DEFAULT_NORMAL_PRICE || '';
     const priceText = normalPrice;
 
     let body = `${data.name} 様\n\n` +
@@ -151,7 +151,7 @@ async function sendChatNotification(data: any, bookingId: string, webhookUrl: st
   const text = `*新規体験予約が入りました!*\n` +
                `・店舗: ${data.store}\n` +
                `・日時: ${data.date} ${data.time}\n` +
-               `·お名前: ${data.name} 様 (${data.kana || ''})\n` +
+               `・お名前: ${data.name} 様 (${data.kana || ''})\n` +
                `・電話番号: ${data.phone || ''}\n` +
                `・メール: ${data.email || ''}${emailWarning}\n` +
                `・備考: ${data.notes || 'なし'}\n` +
@@ -178,84 +178,70 @@ export async function POST(req: Request) {
     }
 
     // 1. 店舗情報とグローバル設定の取得
-    const storeDoc = await db.collection('stores').doc(store).get();
-    const storeInfo = storeDoc.exists ? storeDoc.data() : null;
+    const { data: storeInfo, error: storeError } = await supabase
+      .from('stores')
+      .select('*')
+      .eq('name', store)
+      .single();
 
-    const globalDoc = await db.collection('system_config').doc('global').get();
-    const globalConfig = globalDoc.exists ? globalDoc.data() : null;
+    if (storeError && storeError.code !== 'PGRST116') {
+      throw storeError;
+    }
 
-    const calendarId = storeInfo?.カレンダーID || globalConfig?.DEFAULT_CALENDAR_ID || 'primary';
+    const { data: configData } = await supabase
+      .from('system_config')
+      .select('config')
+      .eq('key', 'global')
+      .single();
+    
+    const globalConfig = configData?.config || {};
 
-    // 2. 予約番号の決定と、Firestore Transactionによるダブルブッキング排他ロック制御
+    const calendarId = storeInfo?.calendar_id || globalConfig?.DEFAULT_CALENDAR_ID || 'primary';
+
+    // 2. 予約番号の決定と、ストアドファンクション（RPC）によるダブルブッキング排他ロック制御
     const bookingId = generateShortBookingId();
     const timestamp = new Date().toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' });
 
-    // 同一店舗の該当枠の空き状況をトランザクション内で再検証して安全を確保する
-    const isSlotAvailable = await db.runTransaction(async (transaction) => {
-      // 日ごとの祝日や設定を再チェックするのはフロント側で行い、ここでは単純に予約数の制限チェックを行う
-      // 曜日名を取得
-      const dateObj = new Date(date.replace(/\//g, '/'));
-      const dayNames = ['日', '月', '火', '水', '木', '金', '土'];
-      let dayName = dayNames[dateObj.getDay()];
-
-      // 簡易祝日/休日判定 (実用上はFirestoreとカレンダー等から曜日設定を参照)
-      // 店舗設定ドキュメントを取得
-      const settingsRef = db.collection('stores').doc(store).collection('settings').doc(dayName);
-      const settingsDoc = await transaction.get(settingsRef);
-      const settings = settingsDoc.exists ? settingsDoc.data() : { active: true, maxSlots: 1 };
-
-      const maxSlots = settings?.maxSlots || 1;
-
-      // 現在の予約済み件数を取得
-      const bookingsQuery = db
-        .collection('bookings')
-        .where('store', '==', store)
-        .where('date', '==', date)
-        .where('time', '==', time)
-        .where('status', '==', '予約確定');
-      
-      const bookingsSnapshot = await transaction.get(bookingsQuery);
-      const currentBookedCount = bookingsSnapshot.size;
-
-      if (currentBookedCount >= maxSlots) {
-        return false; // すでに満席
-      }
-
-      // 予約ドキュメントを書き込み登録
-      const bookingRef = db.collection('bookings').doc(bookingId);
-      transaction.set(bookingRef, {
-        timestamp,
-        status: '予約確定',
-        name: data.name,
-        kana: data.kana || '',
-        phone: data.phone,
-        email: data.email,
-        notes: data.notes || '',
-        store,
-        date,
-        time,
-        eventId: '' // 後ほど登録されたIDを入れる
-      });
-
-      return true;
+    // 同一店舗の該当枠の空き状況をトランザクション内で検証して安全に挿入する
+    const { data: isSlotAvailable, error: rpcError } = await supabase.rpc('submit_booking_v1', {
+      p_booking_id: bookingId,
+      p_name: data.name,
+      p_kana: data.kana || '',
+      p_phone: data.phone,
+      p_email: data.email,
+      p_notes: data.notes || '',
+      p_store_name: store,
+      p_date: date,
+      p_time: time,
+      p_timestamp: timestamp
     });
 
+    if (rpcError) {
+      throw rpcError;
+    }
+
     if (!isSlotAvailable) {
-      return NextResponse.json({ success: false, error: '大変申し訳ございません。直前に他のお客様の予約が入ったため、選択された枠が満席になりました。他の時間帯を選択してください。' }, { status: 409 });
+      return NextResponse.json({ 
+        success: false, 
+        error: '大変申し訳ございません。直前に他のお客様の予約が入ったため、選択された枠が満席になりました。他の時間帯を選択してください。' 
+      }, { status: 409 });
     }
 
     // 3. カレンダーイベントの作成
     const eventId = await createCalendarEvent(data, calendarId);
     if (eventId) {
-      // 予約ドキュメントにeventIdを反映
-      await db.collection('bookings').doc(bookingId).update({ eventId });
+      // 予約レコードに event_id を反映
+      await supabase
+        .from('bookings')
+        .update({ event_id: eventId })
+        .eq('id', bookingId);
     }
 
     // 4. 自動返信確認メールの送信
     const emailSuccess = await sendConfirmationEmail(data, bookingId, storeInfo, globalConfig);
 
     // 5. Google ChatへのWebhook通知
-    const webhookUrl = storeInfo?.WebhookURL || globalConfig?.DEFAULT_WEBHOOK_URL || '';
+    const webhookUrl = storeInfo?.webhook_url || globalConfig?.DEFAULT_WEBHOOK_URL || '';
     await sendChatNotification(data, bookingId, webhookUrl, !emailSuccess);
 
     return NextResponse.json({ success: true, bookingId });
